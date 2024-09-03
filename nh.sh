@@ -37,7 +37,7 @@ install_packages() {
 
 # 配置 Debian 源
 configure_debian_sources() {
-    DEBIAN_VERSION=$(lsb_release -sc)
+    DEBIAN_VERSION=$(lsb_release -cs)  # 使用小写字母的版本代号
     if [ "$DEBIAN_VERSION" = "bullseye" ]; then
         echo "deb http://deb.debian.org/debian bullseye-backports main" | sudo tee /etc/apt/sources.list.d/backports.list
     elif [ "$DEBIAN_VERSION" = "bookworm" ]; then
@@ -164,43 +164,34 @@ install_kernel() {
             if [ $? -eq 0 ]; then
                 echo "$kernel 已成功卸载。"
             else
-                echo "卸载 $kernel 时出错。"
+                echo "卸载 $kernel 失败。"
             fi
         done
-
-        # 删除 XanMod 仓库和 GPG 密钥
-        echo "正在删除 XanMod 仓库和 GPG 密钥..."
-        sudo rm /etc/apt/sources.list.d/xanmod-release.list
-        sudo rm /usr/share/keyrings/xanmod-archive-keyring.gpg
-
-        # 更新 GRUB 配置
-        echo "正在更新 GRUB 配置..."
-        update_grub
-
-        echo "XanMod 内核及相关配置已卸载。请重新启动系统以应用更改。"
     elif [[ "$KERNEL_CHOICE" = "6" ]]; then
-        echo "退出脚本。"
+        echo "退出。"
         exit 0
     else
-        echo "无效的选择，请重新运行脚本。"
+        echo "无效的选择。"
         exit 1
     fi
-}
 
-# 更新 GRUB 配置
-update_grub() {
-    if [[ "$OS" == "ubuntu" || "$OS" == "debian" ]]; then
-        sudo update-grub
-    elif [[ "$OS" == "centos" || "$OS" == "almalinux" ]]; then
-        sudo grub2-mkconfig -o /boot/grub2/grub.cfg
+    # 提示用户是否需要重启
+    read -p "是否需要重启系统？[y/N]: " reboot_choice
+    if [[ $reboot_choice == [yY] ]]; then
+        sudo reboot
     else
-        echo "不支持的操作系统: $OS"
-        exit 1
+        echo "请记得手动重启系统以应用内核更改。"
     fi
 }
 
-# 安装必要的软件包
+# 主脚本逻辑
 install_packages
+
+if [[ "$OS" == "debian" ]]; then
+    configure_debian_sources
+fi
+
+install_kernel
 
 # 配置 Debian 源
 if [[ "$OS" == "ubuntu" || "$OS" == "debian" ]]; then
