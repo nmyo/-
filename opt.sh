@@ -1,13 +1,5 @@
 #!/bin/bash
 
-# 日志记录函数
-log() {
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a /var/log/optimize.log
-}
-
-# 错误处理
-trap 'log "脚本遇到错误，中止执行"; exit 1' ERR
-
 # 检测操作系统类型
 detect_os() {
     if [ -f /etc/redhat-release ]; then
@@ -15,7 +7,7 @@ detect_os() {
     elif [ -f /etc/debian_version ]; then
         echo "Debian"
     else
-        log "不支持的操作系统"
+        echo "不支持的操作系统"
         exit 1
     fi
 }
@@ -23,7 +15,6 @@ detect_os() {
 # 更新系统
 update_system() {
     local os=$1
-    log "更新系统"
     if [ "$os" == "RHEL" ]; then
         yum makecache
         yum install epel-release -y
@@ -38,7 +29,6 @@ update_system() {
 # 安装 haveged
 install_haveged() {
     local os=$1
-    log "安装 haveged"
     if [ "$os" == "RHEL" ]; then
         yum install haveged -y
     elif [ "$os" == "Debian" ]; then
@@ -48,17 +38,20 @@ install_haveged() {
 
 # 配置 haveged 服务
 configure_haveged() {
-    log "配置 haveged 服务"
     systemctl disable --now haveged
     systemctl enable --now haveged && systemctl start --now haveged
 }
 
 # 优化内核
 optimize_kernel() {
-    log "优化内核"
-    cat > /etc/sysctl.d/99-custom.conf << EOL
+    cat > /etc/sysctl.conf << EOL
 # ------ 网络调优: 基本 ------
+# TTL 配置, Linux 默认 64
+# net.ipv4.ip_default_ttl=64
+
+# 参阅 RFC 1323. 应当启用.
 net.ipv4.tcp_timestamps=1
+# ------ END 网络调优: 基本 ------
 
 # ------ 网络调优: 内核 Backlog 队列和缓存相关 ------
 net.core.wmem_default=16384
@@ -84,8 +77,10 @@ net.netfilter.nf_conntrack_tcp_timeout_fin_wait=30
 net.netfilter.nf_conntrack_tcp_timeout_time_wait=30
 net.netfilter.nf_conntrack_tcp_timeout_close_wait=15
 net.netfilter.nf_conntrack_tcp_timeout_established=300
+net.ipv4.netfilter.ip_conntrack_tcp_timeout_established=7200
 net.ipv4.tcp_tw_reuse=1
 net.ipv4.tcp_max_tw_buckets=55000
+# ------ END 网络调优: 内核 Backlog 队列和缓存相关 ------
 
 # ------ 网络调优: 其他 ------
 net.ipv4.tcp_sack=1
@@ -118,6 +113,7 @@ net.ipv4.conf.lo.arp_announce=2
 net.ipv4.conf.all.arp_announce=2
 net.ipv4.ip_forward = 1
 net.ipv6.conf.all.forwarding=1
+# ------ END 网络调优: 其他 ------
 
 # ------ 内核调优 ------
 kernel.panic=1
@@ -126,6 +122,7 @@ kernel.shmmax=4294967296
 kernel.shmall=1073741824
 kernel.core_pattern=core_%e
 vm.panic_on_oom=1
+# vm.min_free_kbytes=1048576
 vm.vfs_cache_pressure=250
 vm.swappiness=10
 vm.dirty_ratio=10
@@ -136,12 +133,11 @@ fs.inotify.max_user_watches=8192
 kernel.sysrq=1
 vm.zone_reclaim_mode=0
 EOL
-    sysctl --system
+    sysctl -p
 }
 
 # 配置文件限制
 configure_limits() {
-    log "配置文件限制"
     cat > /etc/security/limits.conf << EOL
 * soft nofile 512000
 * hard nofile 512000
@@ -152,33 +148,28 @@ root hard nofile 512000
 root soft nproc 512000
 root hard nproc 512000
 EOL
-    ulimit -n 512000
-    ulimit -u 512000
 }
 
 # 配置 systemd 日志限制
 configure_journal() {
-    log "配置 systemd 日志限制"
     cat > /etc/systemd/journald.conf << EOL
 [Journal]
 SystemMaxUse=384M
 SystemMaxFileSize=128M
 ForwardToSyslog=no
 EOL
-    systemctl restart systemd-journald
 }
 
 # 配置 IPv4 优先
 configure_ipv4_priority() {
-    log "配置 IPv4 优先"
     sed -i 's/#precedence ::ffff:0:0\/96  100/precedence ::ffff:0:0\/96  100/' /etc/gai.conf
 
     # 验证设置是否已成功应用
     ip_output=$(curl -s ip.sb)
     if [[ $ip_output =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        log "IPv4 优先配置已成功应用: $ip_output"
+        echo "IPv4 优先配置已成功应用: $ip_output"
     else
-        log "IPv4 优先配置未能应用: $ip_output"
+        echo "IPv4 优先配置未能应用: $ip_output"
     fi
 }
 
@@ -194,7 +185,9 @@ main() {
     configure_journal
     configure_ipv4_priority
 
-    log "优化完成"
+    echo "优化完成"
 }
 
 main
+
+EOF
