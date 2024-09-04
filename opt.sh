@@ -44,7 +44,7 @@ configure_haveged() {
 
 # 优化内核
 optimize_kernel() {
-    cat > /etc/sysctl.conf << EOL
+    cat << EOL | tee /etc/sysctl.conf
 # ------ 网络调优: 基本 ------
 # TTL 配置, Linux 默认 64
 # net.ipv4.ip_default_ttl=64
@@ -138,7 +138,7 @@ EOL
 
 # 配置文件限制
 configure_limits() {
-    cat > /etc/security/limits.conf << EOL
+    cat << EOL | tee /etc/security/limits.conf
 * soft nofile 512000
 * hard nofile 512000
 * soft nproc 512000
@@ -152,7 +152,7 @@ EOL
 
 # 配置 systemd 日志限制
 configure_journal() {
-    cat > /etc/systemd/journald.conf << EOL
+    cat << EOL | tee /etc/systemd/journald.conf
 [Journal]
 SystemMaxUse=384M
 SystemMaxFileSize=128M
