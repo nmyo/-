@@ -1,45 +1,108 @@
 #!/bin/bash
 
-# 检测操作系统类型
-detect_os() {
-    if [ -f /etc/redhat-release ]; then
-        echo "RHEL"
-    elif [ -f /etc/debian_version ]; then
-        echo "Debian"
+# 定义高亮颜色
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m' # 没有颜色
+
+# 检测包管理器
+check_package_manager() {
+    if command -v apt &> /dev/null; then
+        PACKAGE_MANAGER="apt"
+    elif command -v yum &> /dev/null; then
+        PACKAGE_MANAGER="yum"
+    elif command -v dnf &> /dev/null; then
+        PACKAGE_MANAGER="dnf"
     else
-        echo "不支持的操作系统"
+        echo -e "${RED}错误: 未检测到支持的包管理器 (apt, yum, dnf)${NC}"
         exit 1
     fi
 }
 
 # 更新系统
 update_system() {
-    local os=$1
-    if [ "$os" == "RHEL" ]; then
-        yum makecache
-        yum install epel-release -y
-        yum update -y
-    elif [ "$os" == "Debian" ]; then
-        apt update
-        apt dist-upgrade -y
-        apt autoremove --purge -y
-    fi
+    case "$PACKAGE_MANAGER" in
+        apt)
+            apt update
+            apt dist-upgrade -y
+            apt autoremove --purge -y
+            ;;
+        yum)
+            yum makecache
+            yum install epel-release -y
+            yum update -y
+            ;;
+        dnf)
+            dnf makecache
+            dnf install epel-release -y
+            dnf update -y
+            ;;
+    esac
+}
+
+# 安装必要依赖
+install_dependencies() {
+    case "$PACKAGE_MANAGER" in
+        apt)
+            apt install -y curl
+            ;;
+        yum)
+            yum install -y curl
+            ;;
+        dnf)
+            dnf install -y curl
+            ;;
+    esac
 }
 
 # 安装 haveged
 install_haveged() {
-    local os=$1
-    if [ "$os" == "RHEL" ]; then
-        yum install haveged -y
-    elif [ "$os" == "Debian" ]; then
-        apt install haveged -y
-    fi
+    case "$PACKAGE_MANAGER" in
+        apt)
+            apt install haveged -y
+            ;;
+        yum)
+            yum install haveged -y
+            ;;
+        dnf)
+            dnf install haveged -y
+            ;;
+    esac
 }
 
 # 配置 haveged 服务
 configure_haveged() {
     systemctl disable --now haveged
     systemctl enable --now haveged && systemctl start --now haveged
+}
+
+# 检查 haveged 状态
+check_haveged_status() {
+    if systemctl is-active --quiet haveged; then
+        echo -e "${GREEN}haveged 服务已成功启动${NC}"
+    else
+        echo -e "${RED}haveged 服务未启动，请检查配置${NC}"
+    fi
+}
+
+# 配置 swap 文件
+configure_swap() {
+    mem=$(free -m | awk '/^Mem:/{print $2}')
+    swap=$(free -m | awk '/^Swap:/{print $2}')
+
+    # 检查内存是否小于等于 512MB，并且系统中是否已存在 swap 文件
+    if [ "$mem" -le 512 ] && [ "$swap" -eq 0 ]; then
+        fallocate -l 1G /swapfile
+        chmod 600 /swapfile
+        mkswap /swapfile
+        swapon /swapfile
+        echo '/swapfile none swap sw 0 0' | tee -a /etc/fstab
+        echo -e "${GREEN}系统内存小于等于 512MB，已添加 1GB swap 文件${NC}"
+    elif [ "$swap" -gt 0 ]; then
+        echo -e "${GREEN}系统内存小于等于 512MB，但已存在 swap 文件，当前 swap 大小为 ${swap}MB，跳过 swap 配置${NC}"
+    else
+        echo -e "${GREEN}系统内存大于 512MB，跳过 swap 配置${NC}"
+    fi
 }
 
 # 优化内核
@@ -122,7 +185,6 @@ kernel.shmmax=4294967296
 kernel.shmall=1073741824
 kernel.core_pattern=core_%e
 vm.panic_on_oom=1
-# vm.min_free_kbytes=1048576
 vm.vfs_cache_pressure=250
 vm.swappiness=10
 vm.dirty_ratio=10
@@ -167,25 +229,28 @@ configure_ipv4_priority() {
     # 验证设置是否已成功应用
     ip_output=$(curl -s ip.sb)
     if [[ $ip_output =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        echo "IPv4 优先配置已成功应用: $ip_output"
+        echo -e "${GREEN}IPv4 优先配置已成功应用: $ip_output${NC}"
     else
-        echo "IPv4 优先配置未能应用: $ip_output"
+        echo -e "${RED}IPv4 优先配置未能应用: $ip_output${NC}"
     fi
 }
 
 # 主函数执行
 main() {
-    OS=$(detect_os)
-    update_system "$OS"
-    install_haveged "$OS"
+    check_package_manager
+    update_system
+    install_dependencies
+    install_haveged
     configure_haveged
+    check_haveged_status
     modprobe ip_conntrack
     optimize_kernel
     configure_limits
     configure_journal
     configure_ipv4_priority
+    configure_swap
 
-    echo "优化完成"
+    echo -e "${GREEN}优化完成${NC}"
 }
 
 main
