@@ -79,37 +79,56 @@ install_haveged() {
                 ;;
         esac
         echo -e "${GREEN}haveged 已安装完成！${NC}"
-    fi
-}
 
-# 配置 haveged 服务
-configure_haveged() {
-    if systemctl is-active --quiet haveged; then
-        echo -e "${GREEN}haveged 服务已启用并运行。${NC}"
-    else
-        echo -e "${GREEN}配置并启用 haveged 服务...${NC}"
-        systemctl disable --now haveged
-        systemctl enable --now haveged && systemctl start --now haveged
-        echo -e "${GREEN}haveged 服务已启用并启动。${NC}"
+        # 启动和启用 haveged 服务
+        echo -e "${GREEN}启动和启用 haveged 服务...${NC}"
+        systemctl enable haveged
+        systemctl start haveged
+        echo -e "${GREEN}haveged 服务已启动并启用。${NC}"
     fi
 }
 
 # 配置 swap 文件
 configure_swap() {
-    mem=$(free -m | awk '/^Mem:/{print $2}')
-    swap=$(free -m | awk '/^Swap:/{print $2}')
+    # 检查是否安装了 virt-what 工具
+    if ! command -v virt-what &> /dev/null; then
+        echo -e "${GREEN}virt-what 未安装，尝试安装...${NC}"
+        case "$PACKAGE_MANAGER" in
+            apt)
+                apt install -y virt-what
+                ;;
+            yum)
+                yum install -y virt-what
+                ;;
+            dnf)
+                dnf install -y virt-what
+                ;;
+        esac
+    fi
 
-    # 检查内存是否小于等于 512MB，并且系统中是否已存在 swap 文件
-    if [ "$mem" -le 512 ] && [ "$swap" -eq 0 ]; then
-        echo -e "${GREEN}内存 <= 512MB, 当前没有 swap 文件，创建 1GB 的 swap 文件...${NC}"
-        fallocate -l 1G /swapfile
-        chmod 600 /swapfile
-        mkswap /swapfile
-        swapon /swapfile
-        echo '/swapfile none swap sw 0 0' | tee -a /etc/fstab
-        echo -e "${GREEN}1GB 的 swap 文件已创建并启用！${NC}"
+    # 检查系统虚拟化类型
+    virtualization_type=$(virt-what 2>/dev/null)
+
+    if [[ "$virtualization_type" == *"kvm"* ]]; then
+        echo -e "${GREEN}检测到系统使用 KVM 虚拟化，进行 swap 文件配置...${NC}"
+
+        mem=$(free -m | awk '/^Mem:/{print $2}')
+        swap=$(free -m | awk '/^Swap:/{print $2}')
+
+        # 检查内存是否小于等于 512MB，并且系统中是否已存在 swap 文件
+        if [ "$mem" -le 512 ] && [ "$swap" -eq 0 ]; then
+            echo -e "${GREEN}内存 <= 512MB, 当前没有 swap 文件，创建 1GB 的 swap 文件...${NC}"
+            fallocate -l 1G /swapfile
+            chmod 600 /swapfile
+            mkswap /swapfile
+            swapon /swapfile
+            echo '/swapfile none swap sw 0 0' | tee -a /etc/fstab
+            echo -e "${GREEN}1GB 的 swap 文件已创建并启用！${NC}"
+        else
+            echo -e "${GREEN}系统内存 > 512MB 或已经存在 swap 文件，跳过 swap 文件配置。${NC}"
+        fi
     else
-        echo -e "${GREEN}系统内存 > 512MB 或已经存在 swap 文件，跳过 swap 文件配置。${NC}"
+        echo -e "${RED}系统不使用 KVM 虚拟化，跳过 swap 文件配置。${NC}"
     fi
 }
 
@@ -232,8 +251,31 @@ EOL
 
 # 配置 IPv4 优先
 configure_ipv4_priority() {
-    sed -i 's/#precedence ::ffff:0:0\/96  100/precedence ::ffff:0:0\/96  100/' /etc/gai.conf
-    echo -e "${GREEN}已设置 IPv4 优先。${NC}"
+    # 检查是否存在有效的 IPv4 地址
+    if ip -4 addr show | grep -E 'inet ' | grep -vE '127.0.0.1|::' > /dev/null; then
+        echo -e "${GREEN}检测到有效的 IPv4 地址，配置 IPv4 优先级。${NC}"
+
+        # 备份原始配置文件
+        cp /etc/gai.conf /etc/gai.conf.bak
+
+        # 设置 IPv4 优先
+        if grep -q '^precedence ::ffff:0:0/96  100' /etc/gai.conf; then
+            echo -e "${GREEN}IPv4 优先设置已经存在。${NC}"
+        else
+            sed -i 's/#precedence ::ffff:0:0\/96  100/precedence ::ffff:0:0\/96  100/' /etc/gai.conf
+            echo -e "${GREEN}IPv4 优先设置已应用。${NC}"
+        fi
+
+        # 验证设置是否已成功应用
+        ip_output=$(curl -s ip.sb)
+        if [[ $ip_output =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo -e "${GREEN}IPv4 优先配置已成功应用: $ip_output${NC}"
+        else
+            echo -e "${RED}IPv4 优先配置未能应用: $ip_output${NC}"
+        fi
+    else
+        echo -e "${RED}未检测到有效的 IPv4 地址，跳过 IPv4 优先级配置。${NC}"
+    fi
 }
 
 # 主函数
@@ -242,7 +284,6 @@ main() {
     update_system
     install_dependencies
     install_haveged
-    configure_haveged
     configure_swap
     optimize_kernel
     configure_limits
