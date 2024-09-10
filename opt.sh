@@ -61,25 +61,37 @@ install_dependencies() {
     esac
 }
 
-# 安装 haveged
+# 检查并安装 haveged
 install_haveged() {
-    case "$PACKAGE_MANAGER" in
-        apt)
-            apt install haveged -y
-            ;;
-        yum)
-            yum install haveged -y
-            ;;
-        dnf)
-            dnf install haveged -y
-            ;;
-    esac
+    if command -v haveged &> /dev/null; then
+        echo -e "${GREEN}haveged 已安装，跳过安装。${NC}"
+    else
+        echo -e "${GREEN}开始安装 haveged...${NC}"
+        case "$PACKAGE_MANAGER" in
+            apt)
+                apt install haveged -y
+                ;;
+            yum)
+                yum install haveged -y
+                ;;
+            dnf)
+                dnf install haveged -y
+                ;;
+        esac
+        echo -e "${GREEN}haveged 已安装完成！${NC}"
+    fi
 }
 
 # 配置 haveged 服务
 configure_haveged() {
-    systemctl disable --now haveged
-    systemctl enable --now haveged && systemctl start --now haveged
+    if systemctl is-active --quiet haveged; then
+        echo -e "${GREEN}haveged 服务已启用并运行。${NC}"
+    else
+        echo -e "${GREEN}配置并启用 haveged 服务...${NC}"
+        systemctl disable --now haveged
+        systemctl enable --now haveged && systemctl start --now haveged
+        echo -e "${GREEN}haveged 服务已启用并启动。${NC}"
+    fi
 }
 
 # 配置 swap 文件
@@ -89,11 +101,15 @@ configure_swap() {
 
     # 检查内存是否小于等于 512MB，并且系统中是否已存在 swap 文件
     if [ "$mem" -le 512 ] && [ "$swap" -eq 0 ]; then
+        echo -e "${GREEN}内存 <= 512MB, 当前没有 swap 文件，创建 1GB 的 swap 文件...${NC}"
         fallocate -l 1G /swapfile
         chmod 600 /swapfile
         mkswap /swapfile
         swapon /swapfile
         echo '/swapfile none swap sw 0 0' | tee -a /etc/fstab
+        echo -e "${GREEN}1GB 的 swap 文件已创建并启用！${NC}"
+    else
+        echo -e "${GREEN}系统内存 > 512MB 或已经存在 swap 文件，跳过 swap 文件配置。${NC}"
     fi
 }
 
@@ -217,17 +233,10 @@ EOL
 # 配置 IPv4 优先
 configure_ipv4_priority() {
     sed -i 's/#precedence ::ffff:0:0\/96  100/precedence ::ffff:0:0\/96  100/' /etc/gai.conf
-
-    # 验证设置是否已成功应用
-    ip_output=$(curl -s ip.sb)
-    if [[ $ip_output =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        echo -e "${GREEN}IPv4 优先配置已成功应用: $ip_output${NC}"
-    else
-        echo -e "${RED}IPv4 优先配置未能应用: $ip_output${NC}"
-    fi
+    echo -e "${GREEN}已设置 IPv4 优先。${NC}"
 }
 
-# 主函数执行
+# 主函数
 main() {
     check_package_manager
     update_system
@@ -239,27 +248,6 @@ main() {
     configure_limits
     configure_journal
     configure_ipv4_priority
-
-    # 提示 haveged 状态
-    if systemctl is-active --quiet haveged; then
-        echo -e "${GREEN}haveged 服务已成功启动${NC}"
-    else
-        echo -e "${RED}haveged 服务未启动，请检查配置${NC}"
-    fi
-
-    # 提示 swap 配置
-    mem=$(free -m | awk '/^Mem:/{print $2}')
-    swap=$(free -m | awk '/^Swap:/{print $2}')
-
-    if [ "$mem" -le 512 ] && [ "$swap" -eq 0 ]; then
-        echo -e "${GREEN}系统内存小于等于 512MB，已添加 1GB swap 文件${NC}"
-    elif [ "$swap" -gt 0 ]; then
-        echo -e "${GREEN}系统内存小于等于 512MB，但已存在 swap 文件，当前 swap 大小为 ${swap}MB，跳过 swap 配置${NC}"
-    else
-        echo -e "${GREEN}系统内存大于 512MB，跳过 swap 配置${NC}"
-    fi
-
-    echo -e "${GREEN}优化完成${NC}"
 }
 
-main
+main "$@"
