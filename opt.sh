@@ -21,36 +21,42 @@ check_package_manager() {
 
 # 更新系统
 update_system() {
-    case "$PACKAGE_MANAGER" in
-        apt)
-            apt update
-            apt dist-upgrade -y
-            apt autoremove --purge -y
-            ;;
-        yum)
-            yum makecache
-            yum install epel-release -y
-            yum update -y
-            ;;
-        dnf)
-            dnf makecache
-            dnf install epel-release -y
-            dnf update -y
-            ;;
-    esac
+    echo -e "${GREEN}是否要更新系统？(y/n)${NC}"
+    read -r update_choice
+    if [[ "$update_choice" =~ ^[Yy]$ ]]; then
+        case "$PACKAGE_MANAGER" in
+            apt)
+                apt update
+                apt dist-upgrade -y
+                apt autoremove --purge -y
+                ;;
+            yum)
+                yum makecache
+                yum install epel-release -y
+                yum update -y
+                ;;
+            dnf)
+                dnf makecache
+                dnf install epel-release -y
+                dnf update -y
+                ;;
+        esac
+    else
+        echo -e "${GREEN}跳过系统更新${NC}"
+    fi
 }
 
 # 安装必要依赖
 install_dependencies() {
     case "$PACKAGE_MANAGER" in
         apt)
-            apt install -y curl
+            apt install -y curl vnstat sudo vim
             ;;
         yum)
-            yum install -y curl
+            yum install -y curl vnstat sudo vim
             ;;
         dnf)
-            dnf install -y curl
+            dnf install -y curl vnstat sudo vim
             ;;
     esac
 }
@@ -76,15 +82,6 @@ configure_haveged() {
     systemctl enable --now haveged && systemctl start --now haveged
 }
 
-# 检查 haveged 状态
-check_haveged_status() {
-    if systemctl is-active --quiet haveged; then
-        echo -e "${GREEN}haveged 服务已成功启动${NC}"
-    else
-        echo -e "${RED}haveged 服务未启动，请检查配置${NC}"
-    fi
-}
-
 # 配置 swap 文件
 configure_swap() {
     mem=$(free -m | awk '/^Mem:/{print $2}')
@@ -97,11 +94,6 @@ configure_swap() {
         mkswap /swapfile
         swapon /swapfile
         echo '/swapfile none swap sw 0 0' | tee -a /etc/fstab
-        echo -e "${GREEN}系统内存小于等于 512MB，已添加 1GB swap 文件${NC}"
-    elif [ "$swap" -gt 0 ]; then
-        echo -e "${GREEN}系统内存小于等于 512MB，但已存在 swap 文件，当前 swap 大小为 ${swap}MB，跳过 swap 配置${NC}"
-    else
-        echo -e "${GREEN}系统内存大于 512MB，跳过 swap 配置${NC}"
     fi
 }
 
@@ -242,13 +234,30 @@ main() {
     install_dependencies
     install_haveged
     configure_haveged
-    check_haveged_status
-    modprobe ip_conntrack
+    configure_swap
     optimize_kernel
     configure_limits
     configure_journal
     configure_ipv4_priority
-    configure_swap
+
+    # 提示 haveged 状态
+    if systemctl is-active --quiet haveged; then
+        echo -e "${GREEN}haveged 服务已成功启动${NC}"
+    else
+        echo -e "${RED}haveged 服务未启动，请检查配置${NC}"
+    fi
+
+    # 提示 swap 配置
+    mem=$(free -m | awk '/^Mem:/{print $2}')
+    swap=$(free -m | awk '/^Swap:/{print $2}')
+
+    if [ "$mem" -le 512 ] && [ "$swap" -eq 0 ]; then
+        echo -e "${GREEN}系统内存小于等于 512MB，已添加 1GB swap 文件${NC}"
+    elif [ "$swap" -gt 0 ]; then
+        echo -e "${GREEN}系统内存小于等于 512MB，但已存在 swap 文件，当前 swap 大小为 ${swap}MB，跳过 swap 配置${NC}"
+    else
+        echo -e "${GREEN}系统内存大于 512MB，跳过 swap 配置${NC}"
+    fi
 
     echo -e "${GREEN}优化完成${NC}"
 }
