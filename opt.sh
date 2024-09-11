@@ -204,7 +204,7 @@ net.ipv4.neigh.default.gc_stale_time=120
 net.ipv4.conf.default.arp_announce=2
 net.ipv4.conf.lo.arp_announce=2
 net.ipv4.conf.all.arp_announce=2
-net.ipv4.ip_forward = 1
+net.ipv4.ip_forward=1
 net.ipv6.conf.all.forwarding=1
 # ------ END 网络调优: 其他 ------
 
@@ -239,6 +239,7 @@ net.ipv4.conf.all.proxy_arp=1
 net.ipv4.conf.default.proxy_arp=1
 net.ipv4.conf.all.rp_filter=2
 net.ipv4.conf.default.rp_filter=2
+net.ipv6.conf.all.forwarding=1
 EOL
         sysctl --system
         echo -e "${GREEN}端口转发加速配置完成。${NC}"
