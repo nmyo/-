@@ -2,6 +2,7 @@
 
 # 定义高亮颜色
 GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
 RED='\033[0;31m'
 NC='\033[0m' # 没有颜色
 
@@ -118,7 +119,9 @@ configure_swap() {
         # 检查内存是否小于等于 512MB，并且系统中是否已存在 swap 文件
         if [ "$mem" -le 512 ] && [ "$swap" -eq 0 ]; then
             echo -e "${GREEN}内存 <= 512MB, 当前没有 swap 文件，创建 1GB 的 swap 文件...${NC}"
-            fallocate -l 1G /swapfile
+            
+            # 使用 dd 创建 swap 文件
+            dd if=/dev/zero of=/swapfile bs=1M count=1024
             chmod 600 /swapfile
             mkswap /swapfile
             swapon /swapfile
@@ -211,18 +214,37 @@ kernel.pid_max=32768
 kernel.shmmax=4294967296
 kernel.shmall=1073741824
 kernel.core_pattern=core_%e
-vm.panic_on_oom=1
-vm.vfs_cache_pressure=250
-vm.swappiness=10
-vm.dirty_ratio=10
-vm.overcommit_memory=1
-fs.file-max=1048575
-fs.inotify.max_user_instances=8192
-fs.inotify.max_user_watches=8192
-kernel.sysrq=1
-vm.zone_reclaim_mode=0
+kernel.msgmni=1024
+kernel.sem="250 32000 32 256"
+kernel.shm_rmid_forced=1
+# ------ END 内核调优 ------
 EOL
-    sysctl -p
+
+    sysctl --system  # 自动应用配置
+    echo -e "${GREEN}内核优化配置已完成，自动应用配置。${NC}"
+}
+
+# 配置端口转发加速
+configure_port_forwarding_acceleration() {
+    echo -e "${GREEN}是否开启端口转发加速？此配置只建议在中转机上使用(y/n)${NC}"
+    read -r acceleration_choice
+    if [[ "$acceleration_choice" =~ ^[Yy]$ ]]; then
+        echo -e "${GREEN}配置端口转发加速...${NC}"
+        # 添加端口转发加速配置
+        cat << EOL | tee /etc/sysctl.d/99-port-forwarding.conf
+net.ipv4.ip_forward=1
+net.ipv4.conf.all.forwarding=1
+net.ipv4.conf.default.forwarding=1
+net.ipv4.conf.all.proxy_arp=1
+net.ipv4.conf.default.proxy_arp=1
+net.ipv4.conf.all.rp_filter=2
+net.ipv4.conf.default.rp_filter=2
+EOL
+        sysctl --system
+        echo -e "${GREEN}端口转发加速配置完成。${NC}"
+    else
+        echo -e "${GREEN}跳过端口转发加速配置。${NC}"
+    fi
 }
 
 # 配置文件限制
@@ -239,14 +261,17 @@ root hard nproc 512000
 EOL
 }
 
-# 配置 systemd 日志限制
-configure_journal() {
+# 配置 journald
+configure_journald() {
     cat << EOL | tee /etc/systemd/journald.conf
 [Journal]
-SystemMaxUse=384M
-SystemMaxFileSize=128M
-ForwardToSyslog=no
+SystemMaxUse=1G
+RuntimeMaxUse=512M
+SystemMaxFileSize=50M
+RuntimeMaxFileSize=20M
 EOL
+    systemctl restart systemd-journald
+    echo -e "${GREEN}journald 配置已完成。${NC}"
 }
 
 # 配置 IPv4 优先
@@ -278,7 +303,7 @@ configure_ipv4_priority() {
     fi
 }
 
-# 主函数
+# 主程序
 main() {
     check_package_manager
     update_system
@@ -286,9 +311,10 @@ main() {
     install_haveged
     configure_swap
     optimize_kernel
+    configure_port_forwarding_acceleration
     configure_limits
-    configure_journal
+    configure_journald
     configure_ipv4_priority
 }
 
-main "$@"
+main
