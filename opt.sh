@@ -138,41 +138,42 @@ configure_swap() {
 # 优化内核
 optimize_kernel() {
     cat << EOL | tee /etc/sysctl.conf
+
 # ------ 网络调优: 基本 ------
 # TTL 配置, Linux 默认 64
-# net.ipv4.ip_default_ttl=64
+net.ipv4.ip_default_ttl=64
 
 # 参阅 RFC 1323. 应当启用.
 net.ipv4.tcp_timestamps=1
 # ------ END 网络调优: 基本 ------
 
 # ------ 网络调优: 内核 Backlog 队列和缓存相关 ------
-net.core.wmem_default=16384
-net.core.rmem_default=262144
-net.core.rmem_max=536870912
-net.core.wmem_max=536870912
-net.ipv4.tcp_rmem=8192 262144 536870912
-net.ipv4.tcp_wmem=4096 16384 536870912
-net.ipv4.tcp_adv_win_scale=-2
+net.core.wmem_default=65536
+net.core.rmem_default=65536
+net.core.rmem_max=134217728
+net.core.wmem_max=134217728
+net.ipv4.tcp_rmem=8192 65536 134217728
+net.ipv4.tcp_wmem=8192 65536 134217728
+net.ipv4.tcp_adv_win_scale=2
 net.ipv4.tcp_collapse_max_bytes=6291456
-net.ipv4.tcp_notsent_lowat=131072
-net.core.netdev_max_backlog=10240
-net.ipv4.tcp_max_syn_backlog=10240
-net.core.somaxconn=8192
+net.ipv4.tcp_notsent_lowat=16384
+net.core.netdev_max_backlog=20000
+net.ipv4.tcp_max_syn_backlog=20000
+net.core.somaxconn=16384
 net.ipv4.tcp_abort_on_overflow=1
 net.core.default_qdisc=fq_pie
 net.ipv4.tcp_congestion_control=bbr
 net.ipv4.tcp_window_scaling=1
 net.ipv4.tcp_slow_start_after_idle=0
-net.nf_conntrack_max=1000000
-net.netfilter.nf_conntrack_max=1000000
+net.nf_conntrack_max=4000000
+net.netfilter.nf_conntrack_max=4000000
 net.netfilter.nf_conntrack_tcp_timeout_fin_wait=30
 net.netfilter.nf_conntrack_tcp_timeout_time_wait=30
 net.netfilter.nf_conntrack_tcp_timeout_close_wait=15
 net.netfilter.nf_conntrack_tcp_timeout_established=300
 net.ipv4.netfilter.ip_conntrack_tcp_timeout_established=7200
 net.ipv4.tcp_tw_reuse=1
-net.ipv4.tcp_max_tw_buckets=55000
+net.ipv4.tcp_max_tw_buckets=200000
 # ------ END 网络调优: 内核 Backlog 队列和缓存相关 ------
 
 # ------ 网络调优: 其他 ------
@@ -186,7 +187,7 @@ net.ipv4.conf.default.rp_filter=2
 net.ipv4.conf.all.rp_filter=2
 net.ipv4.tcp_fin_timeout=10
 net.ipv4.tcp_no_metrics_save=1
-net.unix.max_dgram_qlen=1024
+net.unix.max_dgram_qlen=2048
 net.ipv4.route.gc_timeout=100
 net.ipv4.tcp_mtu_probing=1
 net.ipv4.conf.all.log_martians=1
@@ -196,10 +197,10 @@ net.ipv4.conf.default.accept_source_route=0
 net.ipv4.tcp_keepalive_time=300
 net.ipv4.tcp_keepalive_probes=2
 net.ipv4.tcp_keepalive_intvl=2
-net.ipv4.tcp_max_orphans=262144
-net.ipv4.neigh.default.gc_thresh1=128
-net.ipv4.neigh.default.gc_thresh2=512
-net.ipv4.neigh.default.gc_thresh3=4096
+net.ipv4.tcp_max_orphans=524288
+net.ipv4.neigh.default.gc_thresh1=256
+net.ipv4.neigh.default.gc_thresh2=1024
+net.ipv4.neigh.default.gc_thresh3=8192
 net.ipv4.neigh.default.gc_stale_time=120
 net.ipv4.conf.default.arp_announce=2
 net.ipv4.conf.lo.arp_announce=2
@@ -215,7 +216,7 @@ kernel.shmmax=4294967296
 kernel.shmall=1073741824
 kernel.core_pattern=core_%e
 kernel.msgmni=1024
-kernel.sem="250 32000 32 256"
+kernel.sem=250 32000 32 256
 kernel.shm_rmid_forced=1
 # ------ END 内核调优 ------
 EOL
