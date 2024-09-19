@@ -51,13 +51,13 @@ update_system() {
 install_dependencies() {
     case "$PACKAGE_MANAGER" in
         apt)
-            apt install -y curl vnstat sudo vim nload lsof dnsutils
+            apt install -y curl vnstat sudo vim nload lsof dnsutils htop
             ;;
         yum)
-            yum install -y curl vnstat sudo vim nload lsof dnsutils
+            yum install -y curl epel-release vnstat sudo vim nload lsof bind-utils htop
             ;;
         dnf)
-            dnf install -y curl vnstat sudo vim nload lsof dnsutils
+            dnf install -y curl epel-release vnstat sudo vim nload lsof bind-utils htop
             ;;
     esac
 }
@@ -320,4 +320,3 @@ main() {
 }
 
 main
-EOF
