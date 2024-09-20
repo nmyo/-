@@ -139,44 +139,35 @@ configure_swap() {
 optimize_kernel() {
     cat << EOL | tee /etc/sysctl.conf
 
-# ------ 网络调优: 基本 ------
-# TTL 配置, Linux 默认 64
 net.ipv4.ip_default_ttl=64
-
-# 参阅 RFC 1323. 应当启用.
 net.ipv4.tcp_timestamps=1
 # ------ END 网络调优: 基本 ------
-
-# ------ 网络调优: 内核 Backlog 队列和缓存相关 ------
-net.core.wmem_default=65536
-net.core.rmem_default=65536
-net.core.rmem_max=134217728
-net.core.wmem_max=134217728
-net.ipv4.tcp_rmem=8192 65536 134217728
-net.ipv4.tcp_wmem=8192 65536 134217728
-net.ipv4.tcp_adv_win_scale=2
-net.ipv4.tcp_collapse_max_bytes=6291456
+net.core.wmem_default=262144
+net.core.rmem_default=262144
+net.core.rmem_max=16777216
+net.core.wmem_max=16777216
+net.ipv4.tcp_rmem=4096 87380 16777216
+net.ipv4.tcp_wmem=4096 65536 16777216
+net.ipv4.tcp_adv_win_scale=1
+net.ipv4.tcp_collapse_max_bytes=5242880
 net.ipv4.tcp_notsent_lowat=16384
-net.core.netdev_max_backlog=20000
-net.ipv4.tcp_max_syn_backlog=20000
-net.core.somaxconn=16384
-net.ipv4.tcp_abort_on_overflow=1
-net.core.default_qdisc=fq_pie
+net.core.netdev_max_backlog=5000
+net.ipv4.tcp_max_syn_backlog=4096
+net.core.somaxconn=4096
+net.ipv4.tcp_abort_on_overflow=0
+net.core.default_qdisc=fq
 net.ipv4.tcp_congestion_control=bbr
 net.ipv4.tcp_window_scaling=1
 net.ipv4.tcp_slow_start_after_idle=0
-net.nf_conntrack_max=4000000
-net.netfilter.nf_conntrack_max=4000000
+net.nf_conntrack_max=1000000
+net.netfilter.nf_conntrack_max=1000000
 net.netfilter.nf_conntrack_tcp_timeout_fin_wait=30
 net.netfilter.nf_conntrack_tcp_timeout_time_wait=30
 net.netfilter.nf_conntrack_tcp_timeout_close_wait=15
 net.netfilter.nf_conntrack_tcp_timeout_established=300
-net.ipv4.netfilter.ip_conntrack_tcp_timeout_established=7200
 net.ipv4.tcp_tw_reuse=1
 net.ipv4.tcp_max_tw_buckets=200000
 # ------ END 网络调优: 内核 Backlog 队列和缓存相关 ------
-
-# ------ 网络调优: 其他 ------
 net.ipv4.tcp_sack=1
 net.ipv4.tcp_fack=1
 net.ipv4.tcp_syn_retries=3
@@ -198,9 +189,9 @@ net.ipv4.tcp_keepalive_time=300
 net.ipv4.tcp_keepalive_probes=2
 net.ipv4.tcp_keepalive_intvl=2
 net.ipv4.tcp_max_orphans=524288
-net.ipv4.neigh.default.gc_thresh1=256
+net.ipv4.neigh.default.gc_thresh1=512
 net.ipv4.neigh.default.gc_thresh2=1024
-net.ipv4.neigh.default.gc_thresh3=8192
+net.ipv4.neigh.default.gc_thresh3=2048
 net.ipv4.neigh.default.gc_stale_time=120
 net.ipv4.conf.default.arp_announce=2
 net.ipv4.conf.lo.arp_announce=2
@@ -208,12 +199,10 @@ net.ipv4.conf.all.arp_announce=2
 net.ipv4.ip_forward=1
 net.ipv6.conf.all.forwarding=1
 # ------ END 网络调优: 其他 ------
-
-# ------ 内核调优 ------
 kernel.panic=1
-kernel.pid_max=32768
-kernel.shmmax=4294967296
-kernel.shmall=1073741824
+kernel.pid_max=65536
+kernel.shmmax=68719476736
+kernel.shmall=4294967296
 kernel.core_pattern=core_%e
 kernel.msgmni=1024
 kernel.sem=250 32000 32 256
