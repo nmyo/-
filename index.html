@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Media</title>
+  <meta name="referrer" content="no-referrer-when-downgrade">
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest/dist/hls.min.js"></script>
+  <style>
+    :root {
+      --yt-red: #ff0000;
+      --bg-dark: #000000;
+      --panel-bg: rgba(28, 28, 28, 0.95);
+      --border-light: rgba(255, 255, 255, 0.1);
+      --ease-click: cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      margin: 0;
+      padding: 0;
+    }
+
+    html,
+    body {
+      height: 100dvh;
+      width: 100%;
+      background: var(--bg-dark);
+      color: #fff;
+      font-family: -apple-system, sans-serif;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* 搜索栏 */
+    .search-container {
+      flex: 0 0 auto;
+      padding: calc(env(safe-area-inset-top, 0px) + 15px) 20px 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+      z-index: 1000;
+    }
+
+    .search-box {
+      display: flex;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 6px 16px;
+      width: 100%;
+      max-width: 500px;
+      border: 1px solid var(--border-light);
+    }
+
+    .search-box input {
+      background: transparent;
+      border: none;
+      color: #fff;
+      font-size: 15px;
+      padding: 4px 0;
+      width: 100%;
+      outline: none;
+    }
+
+    .search-box svg {
+      fill: rgba(255, 255, 255, 0.5);
+      margin-right: 10px;
+      flex-shrink: 0;
+    }
+
+    .search-results-overlay {
+      position: absolute;
+      top: 65px;
+      width: calc(100% - 40px);
+      max-width: 500px;
+      background: var(--panel-bg);
+      backdrop-filter: blur(25px);
+      -webkit-backdrop-filter: blur(25px);
+      border: 1px solid var(--border-light);
+      border-radius: 12px;
+      max-height: 350px;
+      overflow-y: auto;
+      display: none;
+      box-shadow: 0 15px 40px rgba(0, 0, 0, 0.9);
+      animation: fadeIn 0.2s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(-5px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .result-item {
+      padding: 15px 20px;
+      border-bottom: 1px solid var(--border-light);
+      cursor: pointer;
+      font-size: 14px;
+      transition: background 0.2s;
+    }
+
+    .result-item:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .result-item b {
+      color: var(--yt-red);
+    }
+
+    .main-player-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 0 20px;
+    }
+
+    .player-stabilizer {
+      width: 100%;
+      max-width: 860px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #videoTitle {
+      font-size: 11px;
+      font-weight: 700;
+      color: rgba(255, 255, 255, 0.4);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      text-align: center;
+      margin-bottom: 10px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .video-wrapper {
+      position: relative;
+      background: #000;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+      aspect-ratio: 16 / 9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .controls-panel {
+      width: 100%;
+      background: var(--panel-bg);
+      backdrop-filter: blur(25px);
+      -webkit-backdrop-filter: blur(25px);
+      padding: 16px;
+      margin-top: 15px;
+      border-radius: 20px;
+      border: 1px solid var(--border-light);
+    }
+
+    .progress-wrapper {
+      width: 100%;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      touch-action: none;
+    }
+
+    .progress-container {
+      width: 100%;
+      height: 5px;
+      background: rgba(255, 255, 255, 0.1);
+      position: relative;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .progress-buffer {
+      position: absolute;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: var(--yt-red);
+      width: 0%;
+      position: relative;
+    }
+
+    .seek-row {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 6px;
+      margin: 10px 0 15px;
+    }
+
+    .seek-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: none;
+      color: #bbb;
+      padding: 10px 0;
+      font-size: 10px;
+      border-radius: 10px;
+      font-weight: 700;
+      transition: all 0.1s var(--ease-click);
+    }
+
+    .seek-btn:active {
+      transform: scale(0.92);
+      background: rgba(255, 255, 255, 0.2);
+      color: #fff;
+    }
+
+    .bottom-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 40px;
+    }
+
+    .btn-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .btn {
+      background: transparent;
+      border: none;
+      color: #fff;
+      cursor: pointer;
+      padding: 5px;
+      display: flex;
+      align-items: center;
+      transition: 0.1s;
+    }
+
+    .btn:active {
+      transform: scale(0.85);
+      opacity: 0.7;
+    }
+
+    .btn svg {
+      width: 24px;
+      height: 24px;
+      fill: currentColor;
+    }
+
+    #volSlider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 70px;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    #volSlider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 12px;
+      height: 12px;
+      background: #fff;
+      border-radius: 50%;
+    }
+
+    #volSlider::-moz-range-thumb {
+      width: 12px;
+      height: 12px;
+      background: #fff;
+      border-radius: 50%;
+      border: none;
+    }
+
+    #volSlider::-moz-range-track {
+      width: 100%;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 2px;
+    }
+
+    /* 移动端隐藏音量条 */
+    @media (max-width: 768px) {
+      #volSlider {
+        display: none !important;
+      }
+
+      .btn-group {
+        gap: 8px;
+      }
+    }
+
+    #timeBox {
+      font-size: 12px;
+      color: #999;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #speedBtn {
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      padding: 2px 8px;
+      font-size: 11px;
+    }
+
+    .state-overlay {
+      position: absolute;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    .center-btn {
+      width: 66px;
+      height: 66px;
+      background: rgba(255, 0, 0, 0.9);
+      border-radius: 50%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid rgba(255, 255, 255, 0.1);
+      border-top-color: var(--yt-red);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .speed-menu {
+      position: absolute;
+      bottom: 60px;
+      right: 0;
+      background: #222;
+      border-radius: 14px;
+      display: none;
+      flex-direction: column;
+      border: 1px solid #333;
+      z-index: 100;
+      overflow: hidden;
+    }
+
+    .speed-menu.show {
+      display: flex;
+    }
+
+    .speed-item {
+      padding: 12px 25px;
+      font-size: 13px;
+      cursor: pointer;
+      text-align: center;
+      border-bottom: 1px solid #333;
+    }
+
+    .speed-item.active {
+      color: var(--yt-red);
+      background: #2a2a2a;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="search-container">
+    <div class="search-box">
+      <svg viewBox="0 0 24 24" width="20" height="20">
+        <path
+          d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
+      </svg>
+      <input type="text" id="searchInput" placeholder="输入关键词搜索..." autocomplete="off">
+    </div>
+    <div id="resultsList" class="search-results-overlay"></div>
+  </div>
+
+  <div class="main-player-area">
+    <div class="player-stabilizer" id="playerNode">
+      <div id="videoTitle">READY</div>
+
+      <div class="video-wrapper" id="screen">
+        <video id="video" playsinline webkit-playsinline></video>
+        <div class="state-overlay">
+          <div class="center-btn" id="centerPlayIcon">
+            <svg viewBox="0 0 24 24" width="32" height="32" fill="white">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+          </div>
+          <div id="loader" class="hidden">
+            <div class="spinner"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="controls-panel">
+        <div class="progress-wrapper" id="progressWrap">
+          <div class="progress-container">
+            <div class="progress-buffer" id="bufferBar"></div>
+            <div class="progress-bar" id="progressBar"></div>
+          </div>
+        </div>
+
+        <div class="seek-row">
+          <button class="seek-btn" onclick="seek(-600)">-10m</button>
+          <button class="seek-btn" onclick="seek(-60)">-1m</button>
+          <button class="seek-btn" onclick="seek(-10)">-10s</button>
+          <button class="seek-btn" onclick="seek(10)">+10s</button>
+          <button class="seek-btn" onclick="seek(60)">+1m</button>
+          <button class="seek-btn" onclick="seek(600)">+10m</button>
+        </div>
+
+        <div class="bottom-row">
+          <div class="btn-group">
+            <button class="btn" id="playBtn">
+              <svg id="pIcon" viewBox="0 0 24 24">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+            </button>
+            <button class="btn" id="nextBtn">
+              <svg viewBox="0 0 24 24">
+                <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
+              </svg>
+            </button>
+            <div class="btn-group">
+              <button class="btn" id="volBtn"><svg id="vIcon" viewBox="0 0 24 24"></svg></button>
+              <input type="range" id="volSlider" min="0" max="1" step="0.01" value="0.5">
+            </div>
+            <span id="timeBox">0:00 / 0:00</span>
+          </div>
+
+          <div class="btn-group" style="position: relative;">
+            <div class="speed-menu" id="speedMenu">
+              <div class="speed-item" data-val="0.5">0.5x</div>
+              <div class="speed-item active" data-val="1.0">1.0x</div>
+              <div class="speed-item" data-val="1.5">1.5x</div>
+              <div class="speed-item" data-val="2.0">2.0x</div>
+            </div>
+            <button class="btn" id="speedBtn">1.0x</button>
+            <button class="btn" id="pipBtn">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M19 11h-8v6h8v-6zm4 8V4.98C23 3.88 22.1 3 21 3H3c-1.1 0-2 .88-2 1.98V19c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2zm-2 .02H3V4.97h18v14.05z" />
+              </svg>
+            </button>
+            <button class="btn" id="fullBtn">
+              <svg viewBox="0 0 24 24">
+                <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3z" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const $ = id => document.getElementById(id);
+    const video = $('video'), bar = $('progressBar'), buf = $('bufferBar'), wrap = $('progressWrap');
+    const volSlider = $('volSlider'), volBtn = $('volBtn'), searchInput = $('searchInput'), resultsList = $('resultsList');
+
+    let hls = null, isDragging = false, isLoaded = false;
+    let usedCodes = [];
+    const API = "https://apiv.nyanx.de/";
+    let wakeLock = null;
+
+    // 申请屏幕唤醒锁
+    async function requestWakeLock() {
+      if ('wakeLock' in navigator) {
+        try {
+          wakeLock = await navigator.wakeLock.request('screen');
+          wakeLock.addEventListener('release', () => {
+            console.log('屏幕唤醒锁已释放');
+          });
+        } catch (err) {
+          console.error('无法申请屏幕唤醒锁:', err);
+        }
+      }
+    }
+
+    // 释放屏幕唤醒锁
+    function releaseWakeLock() {
+      if (wakeLock) {
+        wakeLock.release();
+        wakeLock = null;
+      }
+    }
+
+    // 页面可见性变化时处理唤醒锁
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        // 页面隐藏时释放唤醒锁
+        releaseWakeLock();
+      } else if (!video.paused && isLoaded) {
+        // 页面可见且视频播放时重新申请唤醒锁
+        requestWakeLock();
+      }
+    });
+
+    const fmt = s => {
+      if (!s || isNaN(s)) return "0:00";
+      const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = Math.floor(s % 60);
+      return h > 0 ? `${h}:${m < 10 ? '0' + m : m}:${r < 10 ? '0' + r : r}` : `${m}:${r < 10 ? '0' + r : r}`;
+    };
+
+    function updateVolUI() {
+      const v = video.volume, m = video.muted;
+      const vIcon = $('vIcon');
+      if (m || v === 0) {
+        vIcon.innerHTML = '<path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.39-.81.62-1.72.62-2.7 0-3.17-2.11-5.85-5-6.71v2.06c1.38.86 2.31 2.36 2.31 4.1s-.93 3.24-2.31 4.1v2.06c2.89-.86 5-3.54 5-6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.52.52-.89 1.15-1.14 1.83h2.06c.13-.27.33-.52.58-.77l.01-.01L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>';
+      } else if (v > 0.5) {
+        vIcon.innerHTML = '<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>';
+      } else {
+        vIcon.innerHTML = '<path d="M18.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM5 9v6h4l5 5V4L9 9H5z"/>';
+      }
+      volSlider.value = m ? 0 : v;
+    }
+
+    async function playNext(keyword = "") {
+      const loader = $('loader');
+      loader.classList.remove('hidden');
+      try {
+        let url = "";
+        const isSearch = keyword && keyword.trim() !== "";
+        if (isSearch) {
+          url = `miss-search.php?title=${encodeURIComponent(keyword.trim())}`;
+        } else {
+          url = `${API}?exclude=${usedCodes.join(',')}`;
+        }
+        
+        // 添加超时控制
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        
+        const res = await fetch(url, { 
+          signal: controller.signal,
+          method: 'GET',
+          mode: 'cors',
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        }
+        
+        const json = await res.json();
+        let listData = [];
+        if (isSearch) {
+          if (json.success && Array.isArray(json.data)) listData = json.data;
+          else if (Array.isArray(json)) listData = json;
+        } else {
+          if (json.m3u8 || json.m3u8_url) listData = [json];
+        }
+        
+        if (listData.length > 0) {
+          resultsList.innerHTML = '';
+          listData.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'result-item';
+            const title = item.title || item.name || "未知视频";
+            const m3u8 = item.m3u8_url || item.m3u8;
+            if (isSearch) {
+              const regex = new RegExp(`(${keyword})`, 'gi');
+              div.innerHTML = title.replace(regex, '<b>$1</b>');
+            } else {
+              div.innerText = title;
+            }
+            div.onclick = (e) => {
+              e.stopPropagation();
+              startVideo(m3u8, title);
+              resultsList.style.display = 'none';
+              searchInput.value = '';
+            };
+            resultsList.appendChild(div);
+          });
+          if (isSearch) resultsList.style.display = 'block';
+          else if (!isSearch && listData.length === 1) startVideo(listData[0].m3u8_url || listData[0].m3u8, listData[0].title || listData[0].name);
+        } else if (isSearch) {
+          resultsList.innerHTML = '<div class="result-item">未找到相关视频</div>';
+          resultsList.style.display = 'block';
+        } else {
+          console.error("没有找到可播放的视频");
+        }
+      } catch (e) {
+        console.error("加载失败:", e);
+        // 详细的错误处理
+        let errorMessage = "加载失败";
+        if (e.name === 'AbortError') {
+          errorMessage = "请求超时，请检查网络连接";
+        } else if (e.message.includes('Failed to fetch')) {
+          errorMessage = "网络连接失败，请检查网络设置";
+        } else if (e.message.includes('CORS')) {
+          errorMessage = "跨域请求被阻止，请使用代理或检查服务器配置";
+        } else {
+          errorMessage = e.message;
+        }
+        
+        if (!keyword) {
+          alert(errorMessage);
+        } else {
+          resultsList.innerHTML = `<div class="result-item">${errorMessage}</div>`;
+          resultsList.style.display = 'block';
+        }
+      } finally {
+        loader.classList.add('hidden');
+      }
+    }
+
+    function startVideo(m3u8, name, auto = true) {
+      if (!m3u8) return;
+      if (hls) hls.destroy();
+      isLoaded = true;
+      $('videoTitle').innerText = (name || "VIDEO").split('_')[0].toUpperCase();
+      let finalUrl = m3u8.replace("https://surrit.com/", "/s1/");
+      const setup = () => {
+        video.volume = volSlider.value;
+        video.muted = true; // 确保每次加载视频时都是静音状态
+        updateVolUI();
+        const history = JSON.parse(localStorage.getItem('video_history') || '{}');
+        if (history[m3u8]) video.currentTime = history[m3u8];
+        if (auto) video.play().catch(() => $('centerPlayIcon').classList.remove('hidden'));
+      };
+      if (Hls.isSupported()) {
+        hls = new Hls(); hls.loadSource(finalUrl); hls.attachMedia(video);
+        hls.on(Hls.Events.MANIFEST_PARSED, setup);
+      } else {
+        video.src = finalUrl; video.onloadedmetadata = setup;
+      }
+      localStorage.setItem('current_video', JSON.stringify({ m3u8, name }));
+    }
+
+    let wrapRect = null;
+    
+    const handleProgress = (e, isFinal = false) => {
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const p = Math.max(0, Math.min(1, (clientX - wrapRect.left) / wrapRect.width));
+      bar.style.width = (p * 100) + "%";
+      if (isFinal) video.currentTime = p * video.duration;
+    };
+
+    wrap.onmousedown = (e) => {
+      isDragging = true;
+      wrapRect = wrap.getBoundingClientRect();
+      handleProgress(e);
+    };
+    
+    window.onmousemove = (e) => {
+      if (isDragging) handleProgress(e);
+    };
+    
+    window.onmouseup = (e) => {
+      if (isDragging) {
+        isDragging = false;
+        handleProgress(e, true);
+      }
+    };
+    
+    wrap.ontouchstart = (e) => {
+      isDragging = true;
+      wrapRect = wrap.getBoundingClientRect();
+      handleProgress(e);
+    };
+    
+    wrap.ontouchmove = (e) => {
+      if (isDragging) {
+        e.preventDefault();
+        handleProgress(e);
+      }
+    };
+    
+    wrap.ontouchend = (e) => {
+      if (isDragging) {
+        isDragging = false;
+        handleProgress(e, true);
+      }
+    };
+
+    video.ontimeupdate = () => {
+      // 保存播放历史
+      const currentVideo = localStorage.getItem('current_video');
+      if (currentVideo && !isDragging) {
+        const data = JSON.parse(currentVideo);
+        const history = JSON.parse(localStorage.getItem('video_history') || '{}');
+        history[data.m3u8] = video.currentTime;
+        localStorage.setItem('video_history', JSON.stringify(history));
+      }
+    };
+
+    video.onplaying = () => {
+      $('pIcon').innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+      $('centerPlayIcon').classList.add('hidden');
+      // 视频播放时申请屏幕唤醒锁
+      requestWakeLock();
+      const up = () => {
+        if (!video.paused && !isDragging) {
+          bar.style.width = (video.currentTime / video.duration * 100) + "%";
+          if (video.buffered.length) buf.style.width = (video.buffered.end(video.buffered.length - 1) / video.duration * 100) + "%";
+          $('timeBox').innerText = `${fmt(video.currentTime)} / ${fmt(video.duration)}`;
+          requestAnimationFrame(up);
+        }
+      };
+      up();
+    };
+
+    video.onpause = () => {
+      if (isLoaded) $('centerPlayIcon').classList.remove('hidden');
+      $('pIcon').innerHTML = '<path d="M8 5v14l11-7z"/>';
+      // 视频暂停时释放屏幕唤醒锁
+      releaseWakeLock();
+    };
+
+    video.onended = () => { 
+      // 视频结束时释放屏幕唤醒锁
+      releaseWakeLock();
+      playNext(); 
+    };
+
+    $('screen').onclick = () => isLoaded ? (video.paused ? video.play() : video.pause()) : playNext();
+    $('playBtn').onclick = () => isLoaded ? (video.paused ? video.play() : video.pause()) : playNext();
+    $('nextBtn').onclick = () => playNext();
+    $('speedBtn').onclick = (e) => { e.stopPropagation(); $('speedMenu').classList.toggle('show'); };
+    $('pipBtn').onclick = () => video.requestPictureInPicture();
+
+    // 修复 iOS 全屏
+    $('fullBtn').onclick = () => {
+      const node = $('playerNode');
+      if (document.fullscreenElement) {
+        document.exitFullscreen();
+      } else if (node.requestFullscreen) {
+        node.requestFullscreen();
+      } else if (video.webkitEnterFullscreen) {
+        // iOS iPhone 专用
+        video.webkitEnterFullscreen();
+      } else if (node.webkitRequestFullscreen) {
+        node.webkitRequestFullscreen();
+      }
+    };
+
+    volSlider.oninput = (e) => { video.volume = e.target.value; video.muted = (video.volume === 0); updateVolUI(); };
+    volBtn.onclick = () => { video.muted = !video.muted; updateVolUI(); };
+
+    document.querySelectorAll('.speed-item').forEach(i => {
+      i.onclick = (e) => {
+        e.stopPropagation(); video.playbackRate = parseFloat(i.dataset.val);
+        $('speedBtn').innerText = i.dataset.val + 'x';
+        document.querySelectorAll('.speed-item').forEach(el => el.classList.remove('active'));
+        i.classList.add('active'); $('speedMenu').classList.remove('show');
+      };
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (document.activeElement === searchInput) return;
+      const k = e.key;
+      if ([' ', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(k)) e.preventDefault();
+      if (k === ' ' || k.toLowerCase() === 'k') isLoaded ? (video.paused ? video.play() : video.pause()) : playNext();
+      if (k === 'ArrowLeft') seek(-10);
+      if (k === 'ArrowRight') seek(10);
+      if (k === 'ArrowUp') { video.volume = Math.min(1, video.volume + 0.1); video.muted = false; updateVolUI(); }
+      if (k === 'ArrowDown') { video.volume = Math.max(0, video.volume - 0.1); updateVolUI(); }
+      if (k.toLowerCase() === 'f') $('fullBtn').click();
+      if (k.toLowerCase() === 'm') volBtn.click();
+    });
+
+    searchInput.onkeydown = (e) => { if (e.key === 'Enter') playNext(searchInput.value.trim()); e.stopPropagation(); };
+    window.seek = s => video.currentTime += s;
+
+    window.onclick = (e) => {
+      if (!e.target.closest('.search-container')) resultsList.style.display = 'none';
+      $('speedMenu').classList.remove('show');
+    };
+
+    window.onload = () => {
+      video.volume = 0.5;
+      video.muted = true; // 初始状态静音
+      updateVolUI();
+      const saved = localStorage.getItem('current_video');
+      if (saved) {
+        const data = JSON.parse(saved);
+        startVideo(data.m3u8, data.name, false);
+      } else {
+        playNext();
+      }
+    };
+  </script>
+</body>
+
+</html>
