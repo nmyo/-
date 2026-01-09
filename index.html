@@ -648,6 +648,9 @@
       $('videoTitle').innerText = (name || "VIDEO").split('_')[0].toUpperCase();
       let finalUrl = m3u8.replace("https://surrit.com/", "/s1/");
       
+      // 创建基于URL的唯一ID用于存储播放历史
+      const videoId = generateVideoId(m3u8);
+      
       // 配置HLS.js参数，启用预缓存
       const hlsConfig = {
         // 启用后缓冲区以支持断点续播
@@ -664,7 +667,20 @@
         lowLatencyMode: true, // 低延迟模式
         progressive: true, // 启用渐进式下载
         // 关键帧对齐
-        forceKeyFrameOnDiscontinuity: true
+        forceKeyFrameOnDiscontinuity: true,
+        // 启用缓存以改善重复播放性能
+        enableWebWorker: true,
+        maxBufferSize: 60 * 1000, // 设置最大缓冲区大小
+        maxBufferHole: 0.5, // 最小缓冲间隙
+        highBufferWatchdogPeriod: 2, // 高缓冲监控周期
+        // 优化加载行为
+        startFragPrefetch: true, // 预加载第一个片段
+        testBandwidth: true, // 测试带宽以选择合适的质量
+        abrEwmaFastLive: 1.3, // 快速带宽估算时间常数
+        abrEwmaSlowLive: 1.5, // 慢速带宽估算时间常数
+        abrEwmaDefaultEstimate: 5e5, // 默认带宽估算 (500 kbps)
+        maxStarvationDelay: 4, // 最大饥饿延迟
+        maxLoadingDelay: 4 // 最大加载延迟
       };
       
       const setup = () => {
@@ -674,8 +690,14 @@
         
         // 尝试从本地存储恢复播放位置
         const history = JSON.parse(localStorage.getItem('video_history') || '{}');
-        if (history[m3u8]) {
-          video.currentTime = history[m3u8];
+        if (history[videoId]) {
+          // 检查视频是否接近结尾，如果是则从头开始播放
+          const savedPosition = history[videoId];
+          if (video.duration && savedPosition > video.duration - 10) {
+            video.currentTime = 0; // 如果距离结尾不到10秒，则从头开始
+          } else {
+            video.currentTime = savedPosition;
+          }
         }
         
         // 监听元数据加载完成事件，此时可以获取准确的持续时间
@@ -685,9 +707,19 @@
             // 预缓存30秒内容
             preloadTimeRange(30);
           });
+          
+          // 监听缓冲区更新事件，持续确保有足够的预加载内容
+          hls.on(Hls.Events.BUFFER_APPENDED, () => {
+            preloadTimeRange(30);
+          });
         } else {
           // 对于原生视频，直接尝试预缓存
           video.addEventListener('loadeddata', () => {
+            preloadTimeRange(30);
+          });
+          
+          // 监听时间更新，确保缓冲区充足
+          video.addEventListener('timeupdate', () => {
             preloadTimeRange(30);
           });
         }
@@ -698,16 +730,28 @@
       // 预缓存指定时间段的函数
       function preloadTimeRange(secondsToPreload) {
         // 这个函数用于确保指定秒数的内容已被缓冲
-        if (video.buffered.length > 0) {
+        if (video.readyState >= 1 && video.buffered.length > 0) { // HAVE_METADATA及以上
           const bufferedEnd = video.buffered.end(video.buffered.length - 1);
           const targetTime = Math.min(video.duration || Infinity, video.currentTime + secondsToPreload);
           
           // 如果缓冲区未达到目标时间，则继续加载
           if (bufferedEnd < targetTime) {
-            // HLS.js会自动管理缓冲区，这里主要确保配置正确
+            // HLS.js会自动管理缓冲区，这里主要是监控和记录
             console.log(`已缓存至: ${bufferedEnd.toFixed(2)}秒, 目标: ${targetTime.toFixed(2)}秒`);
           }
         }
+      }
+      
+      // 生成视频的唯一ID用于存储播放历史
+      function generateVideoId(url) {
+        // 简单的哈希函数生成唯一ID
+        let hash = 0;
+        for (let i = 0; i < url.length; i++) {
+          const char = url.charCodeAt(i);
+          hash = ((hash << 5) - hash) + char;
+          hash |= 0; // 转换为32位整数
+        }
+        return url.length + '_' + Math.abs(hash).toString(36);
       }
       
       if (Hls.isSupported()) {
@@ -719,7 +763,7 @@
         video.src = finalUrl; 
         video.onloadedmetadata = setup;
       }
-      localStorage.setItem('current_video', JSON.stringify({ m3u8, name }));
+      localStorage.setItem('current_video', JSON.stringify({ m3u8, name, videoId }));
     }
 
     let wrapRect = null;
@@ -774,7 +818,14 @@
       if (currentVideo && !isDragging) {
         const data = JSON.parse(currentVideo);
         const history = JSON.parse(localStorage.getItem('video_history') || '{}');
-        history[data.m3u8] = video.currentTime;
+        // 使用视频ID作为键，而不是原始URL
+        history[data.videoId] = video.currentTime;
+        
+        // 如果视频播放完毕（接近结尾），则从历史记录中移除
+        if (video.duration && video.currentTime > video.duration - 5) {
+          delete history[data.videoId]; // 播放完毕后清除历史记录
+        }
+        
         localStorage.setItem('video_history', JSON.stringify(history));
       }
     };
@@ -805,6 +856,16 @@
     video.onended = () => { 
       // 视频结束时释放屏幕唤醒锁
       releaseWakeLock();
+      
+      // 从播放历史中清除当前视频的记录
+      const currentVideo = localStorage.getItem('current_video');
+      if (currentVideo) {
+        const data = JSON.parse(currentVideo);
+        const history = JSON.parse(localStorage.getItem('video_history') || '{}');
+        delete history[data.videoId]; // 播放结束后清除历史记录
+        localStorage.setItem('video_history', JSON.stringify(history));
+      }
+      
       playNext(); 
     };
 
