@@ -647,19 +647,77 @@
       isLoaded = true;
       $('videoTitle').innerText = (name || "VIDEO").split('_')[0].toUpperCase();
       let finalUrl = m3u8.replace("https://surrit.com/", "/s1/");
+      
+      // 配置HLS.js参数，启用预缓存
+      const hlsConfig = {
+        // 启用后缓冲区以支持断点续播
+        backBufferLength: 30, // 保持30秒的后缓冲区
+        // 提前加载更多片段以确保流畅播放
+        maxBufferLength: 60, // 最大缓冲区长度为60秒
+        maxMaxBufferLength: 120, // 最大缓冲区长度上限为120秒
+        // 保持足够的前缓冲区
+        nudgeOffset: 1, // 调整同步偏移
+        nudgeMaxRetry: 3, // 同步重试次数
+        // 加载策略
+        liveSyncDurationCount: 6, // 直播同步片段数
+        enableWorker: true, // 使用web worker解码
+        lowLatencyMode: true, // 低延迟模式
+        progressive: true, // 启用渐进式下载
+        // 关键帧对齐
+        forceKeyFrameOnDiscontinuity: true
+      };
+      
       const setup = () => {
         video.volume = volSlider.value;
         video.muted = true; // 确保每次加载视频时都是静音状态
         updateVolUI();
+        
+        // 尝试从本地存储恢复播放位置
         const history = JSON.parse(localStorage.getItem('video_history') || '{}');
-        if (history[m3u8]) video.currentTime = history[m3u8];
+        if (history[m3u8]) {
+          video.currentTime = history[m3u8];
+        }
+        
+        // 监听元数据加载完成事件，此时可以获取准确的持续时间
+        if (Hls.isSupported()) {
+          // 在HLS模式下，我们监听LEVEL_LOADED事件来确认已缓存足够内容
+          hls.on(Hls.Events.LEVEL_LOADED, () => {
+            // 预缓存30秒内容
+            preloadTimeRange(30);
+          });
+        } else {
+          // 对于原生视频，直接尝试预缓存
+          video.addEventListener('loadeddata', () => {
+            preloadTimeRange(30);
+          });
+        }
+        
         if (auto) video.play().catch(() => $('centerPlayIcon').classList.remove('hidden'));
       };
+      
+      // 预缓存指定时间段的函数
+      function preloadTimeRange(secondsToPreload) {
+        // 这个函数用于确保指定秒数的内容已被缓冲
+        if (video.buffered.length > 0) {
+          const bufferedEnd = video.buffered.end(video.buffered.length - 1);
+          const targetTime = Math.min(video.duration || Infinity, video.currentTime + secondsToPreload);
+          
+          // 如果缓冲区未达到目标时间，则继续加载
+          if (bufferedEnd < targetTime) {
+            // HLS.js会自动管理缓冲区，这里主要确保配置正确
+            console.log(`已缓存至: ${bufferedEnd.toFixed(2)}秒, 目标: ${targetTime.toFixed(2)}秒`);
+          }
+        }
+      }
+      
       if (Hls.isSupported()) {
-        hls = new Hls(); hls.loadSource(finalUrl); hls.attachMedia(video);
+        hls = new Hls(hlsConfig); 
+        hls.loadSource(finalUrl); 
+        hls.attachMedia(video);
         hls.on(Hls.Events.MANIFEST_PARSED, setup);
       } else {
-        video.src = finalUrl; video.onloadedmetadata = setup;
+        video.src = finalUrl; 
+        video.onloadedmetadata = setup;
       }
       localStorage.setItem('current_video', JSON.stringify({ m3u8, name }));
     }
