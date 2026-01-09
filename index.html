@@ -532,6 +532,8 @@
         } catch (err) {
           console.error('无法申请屏幕唤醒锁:', err);
         }
+      } else {
+        console.log('屏幕唤醒锁 API 不可用');
       }
     }
 
@@ -587,7 +589,7 @@
         
         // 添加超时控制
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
         
         const res = await fetch(url, { 
           signal: controller.signal,
@@ -609,6 +611,7 @@
         if (isSearch) {
           if (json.success && Array.isArray(json.data)) listData = json.data;
           else if (Array.isArray(json)) listData = json;
+          else throw new Error('Invalid response format');
         } else {
           if (json.m3u8 || json.m3u8_url) listData = [json];
         }
@@ -899,18 +902,24 @@
     $('playBtn').onclick = () => isLoaded ? (video.paused ? video.play() : video.pause()) : playNext();
     $('nextBtn').onclick = () => playNext();
     $('speedBtn').onclick = (e) => { e.stopPropagation(); $('speedMenu').classList.toggle('show'); };
-    $('pipBtn').onclick = () => video.requestPictureInPicture();
+    $('pipBtn').onclick = async () => {
+      try {
+        await video.requestPictureInPicture();
+      } catch (error) {
+        console.error('画中画启动失败:', error);
+      }
+    };
 
     // 修复 iOS 全屏
     $('fullBtn').onclick = () => {
       const node = $('playerNode');
       if (document.fullscreenElement) {
         document.exitFullscreen();
-      } else if (node.requestFullscreen) {
-        node.requestFullscreen();
       } else if (video.webkitEnterFullscreen) {
         // iOS iPhone 专用
         video.webkitEnterFullscreen();
+      } else if (node.requestFullscreen) {
+        node.requestFullscreen();
       } else if (node.webkitRequestFullscreen) {
         node.webkitRequestFullscreen();
       }
@@ -918,8 +927,6 @@
 
     // 全屏控制栏自动隐藏功能（iOS 除外）
     let fullscreenControlsTimeout;
-    let isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    
     // 检测是否为 iOS 设备
     function isIOSDevice() {
       return /iPad|iPhone|iPod/.test(navigator.userAgent) || 
