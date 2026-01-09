@@ -459,12 +459,12 @@
         </div>
 
         <div class="seek-row">
-          <button class="seek-btn" onclick="seek(-600)">-10m</button>
-          <button class="seek-btn" onclick="seek(-60)">-1m</button>
-          <button class="seek-btn" onclick="seek(-10)">-10s</button>
-          <button class="seek-btn" onclick="seek(10)">+10s</button>
-          <button class="seek-btn" onclick="seek(60)">+1m</button>
-          <button class="seek-btn" onclick="seek(600)">+10m</button>
+          <button class="seek-btn" onclick="window.seek(-600)">-10m</button>
+          <button class="seek-btn" onclick="window.seek(-60)">-1m</button>
+          <button class="seek-btn" onclick="window.seek(-10)">-10s</button>
+          <button class="seek-btn" onclick="window.seek(10)">+10s</button>
+          <button class="seek-btn" onclick="window.seek(60)">+1m</button>
+          <button class="seek-btn" onclick="window.seek(600)">+10m</button>
         </div>
 
         <div class="bottom-row">
@@ -709,7 +709,12 @@
         abrEwmaSlowLive: 1.5, // 慢速带宽估算时间常数
         abrEwmaDefaultEstimate: 5e5, // 默认带宽估算 (500 kbps)
         maxStarvationDelay: 4, // 最大饥饿延迟
-        maxLoadingDelay: 4 // 最大加载延迟
+        maxLoadingDelay: 4, // 最大加载延迟
+        // 修复重复配置项
+        xhrSetup: function(xhr, url) {
+          // 允许跨域请求
+          xhr.withCredentials = false;
+        }
       };
       
       const setup = () => {
@@ -753,20 +758,39 @@
           });
         }
         
-        if (auto) video.play().catch(() => $('centerPlayIcon').classList.remove('hidden'));
+        if (auto) {
+          const playPromise = video.play();
+          if (playPromise !== undefined) {
+            playPromise
+              .then(() => {
+                // 播放成功
+                $('centerPlayIcon').classList.add('hidden');
+              })
+              .catch(error => {
+                console.log('自动播放失败:', error);
+                // 如果自动播放失败，显示播放按钮
+                $('centerPlayIcon').classList.remove('hidden');
+              });
+          }
+        }
       };
       
       // 预缓存指定时间段的函数
       function preloadTimeRange(secondsToPreload) {
         // 这个函数用于确保指定秒数的内容已被缓冲
         if (video.readyState >= 1 && video.buffered.length > 0) { // HAVE_METADATA及以上
-          const bufferedEnd = video.buffered.end(video.buffered.length - 1);
-          const targetTime = Math.min(video.duration || Infinity, video.currentTime + secondsToPreload);
-          
-          // 如果缓冲区未达到目标时间，则继续加载
-          if (bufferedEnd < targetTime) {
-            // HLS.js会自动管理缓冲区，这里主要是监控和记录
-            console.log(`已缓存至: ${bufferedEnd.toFixed(2)}秒, 目标: ${targetTime.toFixed(2)}秒`);
+          try {
+            const bufferedEnd = video.buffered.end(video.buffered.length - 1);
+            const targetTime = Math.min(video.duration || Infinity, video.currentTime + secondsToPreload);
+            
+            // 如果缓冲区未达到目标时间，则继续加载
+            if (bufferedEnd < targetTime) {
+              // HLS.js会自动管理缓冲区，这里主要是监控和记录
+              console.log(`已缓存至: ${bufferedEnd.toFixed(2)}秒, 目标: ${targetTime.toFixed(2)}秒`);
+            }
+          } catch(e) {
+            // 处理可能的错误，例如在视频加载初期buffered.end可能不可用
+            console.log('缓冲区信息暂不可用:', e.message);
           }
         }
       }
@@ -845,17 +869,21 @@
       // 保存播放历史
       const currentVideo = localStorage.getItem('current_video');
       if (currentVideo && !isDragging) {
-        const data = JSON.parse(currentVideo);
-        const history = JSON.parse(localStorage.getItem('video_history') || '{}');
-        // 使用视频ID作为键，而不是原始URL
-        history[data.videoId] = video.currentTime;
-        
-        // 如果视频播放完毕（接近结尾），则从历史记录中移除
-        if (video.duration && video.currentTime > video.duration - 5) {
-          delete history[data.videoId]; // 播放完毕后清除历史记录
+        try {
+          const data = JSON.parse(currentVideo);
+          const history = JSON.parse(localStorage.getItem('video_history') || '{}');
+          // 使用视频ID作为键，而不是原始URL
+          history[data.videoId] = video.currentTime;
+          
+          // 如果视频播放完毕（接近结尾），则从历史记录中移除
+          if (video.duration && video.currentTime > video.duration - 5) {
+            delete history[data.videoId]; // 播放完毕后清除历史记录
+          }
+          
+          localStorage.setItem('video_history', JSON.stringify(history));
+        } catch(e) {
+          console.error('更新播放历史时出错:', e);
         }
-        
-        localStorage.setItem('video_history', JSON.stringify(history));
       }
     };
 
@@ -866,8 +894,13 @@
       requestWakeLock();
       const up = () => {
         if (!video.paused && !isDragging) {
-          bar.style.width = (video.currentTime / video.duration * 100) + "%";
-          if (video.buffered.length) buf.style.width = (video.buffered.end(video.buffered.length - 1) / video.duration * 100) + "%";
+          if (video.duration && video.duration > 0) {
+            bar.style.width = (video.currentTime / video.duration * 100) + "%";
+            if (video.buffered.length) buf.style.width = (video.buffered.end(video.buffered.length - 1) / video.duration * 100) + "%";
+          } else {
+            bar.style.width = "0%";
+            buf.style.width = "0%";
+          }
           $('timeBox').innerText = `${fmt(video.currentTime)} / ${fmt(video.duration)}`;
           requestAnimationFrame(up);
         }
@@ -1031,7 +1064,13 @@
       if (k.toLowerCase() === 'm') volBtn.click();
     });
 
-    searchInput.onkeydown = (e) => { if (e.key === 'Enter') playNext(searchInput.value.trim()); e.stopPropagation(); };
+    searchInput.onkeydown = (e) => { 
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        playNext(searchInput.value.trim()); 
+      }
+      e.stopPropagation(); 
+    };
     window.seek = s => video.currentTime += s;
 
     window.onclick = (e) => {
