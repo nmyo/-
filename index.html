@@ -7,7 +7,14 @@
     content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Media</title>
   <meta name="referrer" content="no-referrer-when-downgrade">
-  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest/dist/hls.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.11/dist/hls.min.js"></script>
+  <!-- 预加载关键资源 -->
+  <link rel="preconnect" href="https://cdn.jsdelivr.net">
+  <link rel="preconnect" href="https://apiv.nyanx.de" crossorigin>
+  <!-- 移动端优化 -->
+  <meta name="format-detection" content="telephone=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <style>
     :root {
       --yt-red: #ff0000;
@@ -165,6 +172,15 @@
       width: 100%;
       height: 100%;
       object-fit: contain;
+      /* 移动端渲染优化 */
+      transform: translateZ(0);
+      -webkit-transform: translateZ(0);
+      will-change: transform;
+      /* 硬件加速 */
+      -webkit-backface-visibility: hidden;
+      -webkit-perspective: 1000;
+      backface-visibility: hidden;
+      perspective: 1000;
     }
 
     .controls-panel {
@@ -506,6 +522,109 @@
     let usedCodes = [];
     const API = "https://apiv.nyanx.de/";
     let wakeLock = null;
+    
+    // 移动端网络状况检测
+    function getNetworkQuality() {
+      // 使用 Network Information API 检测网络状况
+      if ('connection' in navigator) {
+        const connection = navigator.connection;
+        const effectiveType = connection.effectiveType || 'unknown';
+        const downlink = connection.downlink || 0;
+        
+        if (effectiveType === 'slow-2g' || effectiveType === '2g') {
+          return 'poor';
+        } else if (effectiveType === '3g' || downlink < 1.5) {
+          return 'moderate';
+        } else if (effectiveType === '4g' || downlink >= 1.5) {
+          return 'good';
+        }
+      }
+      
+      // 如果不支持 Network Information API，返回默认值
+      return 'unknown';
+    }
+    
+    // 根据网络状况调整HLS配置
+    function getHlsConfigForNetwork(networkQuality) {
+      const baseConfig = {
+        // 缓冲区优化 - 减少缓冲区大小以适应移动端内存限制
+        backBufferLength: 10, // 减少后缓冲区，节省内存
+        maxBufferLength: 30, // 降低最大缓冲区长度，减少内存占用
+        maxMaxBufferLength: 60, // 最大缓冲区长度上限
+        // 加载策略 - 优化移动端网络适应性
+        liveSyncDurationCount: 3, // 减少直播同步片段数，降低延迟
+        maxLoadingDelay: 2, // 减少加载延迟
+        maxStarvationDelay: 2, // 减少饥饿延迟
+        // 自适应码率 - 针对移动端网络波动优化
+        abrEwmaFastLive: 2.0, // 增加快速带宽估算时间常数，更稳定
+        abrEwmaSlowLive: 5.0, // 增加慢速带宽估算时间常数，避免频繁切换
+        abrEwmaDefaultEstimate: 5e5, // 默认带宽估算 (500 kbps)
+        abrBandWidthFactor: 0.8, // 降低带宽使用因子，更保守地选择质量
+        abrBandWidthUpFactor: 0.9, // 上调带宽因子
+        // 性能优化
+        enableWorker: true, // 使用web worker解码，减少主线程阻塞
+        workerPath: null, // 使用默认worker路径
+        enableWebWorker: true,
+        lowLatencyMode: true, // 低延迟模式
+        progressive: true, // 启用渐进式下载
+        // 关键帧对齐
+        forceKeyFrameOnDiscontinuity: true,
+        // 网络请求优化
+        maxBufferHole: 0.1, // 减小缓冲间隙，提高连续性
+        highBufferWatchdogPeriod: 1, // 减少高缓冲监控周期
+        // 优化加载行为
+        startFragPrefetch: true, // 预加载第一个片段
+        testBandwidth: true, // 测试带宽以选择合适的质量
+        // 错误处理优化
+        nudgeOffset: 0.1, // 减小调整同步偏移
+        nudgeMaxRetry: 2, // 减少同步重试次数
+        maxFragLookUpTolerance: 0.1, // 减小片段查找容差
+        // 启用网络优化
+        xhrSetup: function(xhr, url) {
+          // 允许跨域请求，添加移动端网络优化
+          xhr.withCredentials = false;
+          // 设置请求超时时间
+          xhr.timeout = 10000; // 10秒超时
+        },
+        // 启用后处理以优化性能
+        fragLoadingTimeOut: 10000, // 片段加载超时
+        fragLoadingMaxRetry: 2, // 片段加载最大重试次数
+        fragLoadingMaxRetryTimeout: 30000, // 片段加载最大重试超时
+        levelLoadingTimeOut: 10000, // 级别加载超时
+        levelLoadingMaxRetry: 2, // 级别加载最大重试次数
+        levelLoadingMaxRetryTimeout: 30000 // 级别加载最大重试超时
+      };
+      
+      // 根据网络质量进一步调整配置
+      switch(networkQuality) {
+        case 'poor':
+          // 网络状况差时，更保守的配置
+          baseConfig.maxBufferLength = 20;
+          baseConfig.backBufferLength = 5;
+          baseConfig.abrBandWidthFactor = 0.6; // 更保守地选择质量
+          baseConfig.abrEwmaDefaultEstimate = 3e5; // 300 kbps
+          baseConfig.startFragPrefetch = false; // 不预加载第一个片段以节省流量
+          break;
+        case 'moderate':
+          // 中等网络状况
+          baseConfig.maxBufferLength = 30;
+          baseConfig.backBufferLength = 10;
+          baseConfig.abrBandWidthFactor = 0.7;
+          baseConfig.abrEwmaDefaultEstimate = 5e5; // 500 kbps
+          baseConfig.startFragPrefetch = true;
+          break;
+        case 'good':
+          // 良好网络状况
+          baseConfig.maxBufferLength = 45;
+          baseConfig.backBufferLength = 15;
+          baseConfig.abrBandWidthFactor = 0.9;
+          baseConfig.abrEwmaDefaultEstimate = 1e6; // 1 Mbps
+          baseConfig.startFragPrefetch = true;
+          break;
+      }
+      
+      return baseConfig;
+    }
 
     // 申请屏幕唤醒锁
     async function requestWakeLock() {
@@ -666,47 +785,18 @@
       // 创建基于URL的唯一ID用于存储播放历史
       const videoId = generateVideoId(m3u8);
       
-      // 配置HLS.js参数，启用预缓存
-      const hlsConfig = {
-        // 启用后缓冲区以支持断点续播
-        backBufferLength: 30, // 保持30秒的后缓冲区
-        // 提前加载更多片段以确保流畅播放
-        maxBufferLength: 60, // 最大缓冲区长度为60秒
-        maxMaxBufferLength: 120, // 最大缓冲区长度上限为120秒
-        // 保持足够的前缓冲区
-        nudgeOffset: 1, // 调整同步偏移
-        nudgeMaxRetry: 3, // 同步重试次数
-        // 加载策略
-        liveSyncDurationCount: 6, // 直播同步片段数
-        enableWorker: true, // 使用web worker解码
-        lowLatencyMode: true, // 低延迟模式
-        progressive: true, // 启用渐进式下载
-        // 关键帧对齐
-        forceKeyFrameOnDiscontinuity: true,
-        // 启用缓存以改善重复播放性能
-        enableWebWorker: true,
-        maxBufferSize: 60 * 1000, // 设置最大缓冲区大小
-        maxBufferHole: 0.5, // 最小缓冲间隙
-        highBufferWatchdogPeriod: 2, // 高缓冲监控周期
-        // 优化加载行为
-        startFragPrefetch: true, // 预加载第一个片段
-        testBandwidth: true, // 测试带宽以选择合适的质量
-        abrEwmaFastLive: 1.3, // 快速带宽估算时间常数
-        abrEwmaSlowLive: 1.5, // 慢速带宽估算时间常数
-        abrEwmaDefaultEstimate: 5e5, // 默认带宽估算 (500 kbps)
-        maxStarvationDelay: 4, // 最大饥饿延迟
-        maxLoadingDelay: 4, // 最大加载延迟
-        // 修复重复配置项
-        xhrSetup: function(xhr, url) {
-          // 允许跨域请求
-          xhr.withCredentials = false;
-        }
-      };
+      // 获取当前网络状况并配置HLS参数
+      const networkQuality = getNetworkQuality();
+      const hlsConfig = getHlsConfigForNetwork(networkQuality);
       
       const setup = () => {
         video.volume = volSlider.value;
         video.muted = true; // 确保每次加载视频时都是静音状态
         updateVolUI();
+        
+        // 移动端性能优化
+        video.setAttribute('playsinline', '');
+        video.setAttribute('webkit-playsinline', '');
         
         // 尝试从本地存储恢复播放位置
         const history = JSON.parse(localStorage.getItem('video_history') || '{}');
@@ -745,17 +835,32 @@
         }
         
         if (auto) {
+          // 移动端优化：先静音播放以绕过自动播放限制
+          video.muted = true;
+          updateVolUI();
           const playPromise = video.play();
           if (playPromise !== undefined) {
             playPromise
               .then(() => {
                 // 播放成功
                 $('centerPlayIcon').classList.add('hidden');
+                // 如果用户之前设置了非静音，则恢复音量
+                setTimeout(() => {
+                  if (!video.muted && video.volume > 0) {
+                    video.muted = false;
+                  }
+                }, 1000);
               })
               .catch(error => {
-
-                // 如果自动播放失败，显示播放按钮
-                $('centerPlayIcon').classList.remove('hidden');
+                // 如果自动播放失败，尝试先静音再播放
+                video.muted = true;
+                updateVolUI();
+                video.play().then(() => {
+                  $('centerPlayIcon').classList.add('hidden');
+                }).catch(() => {
+                  // 如果仍然失败，显示播放按钮
+                  $('centerPlayIcon').classList.remove('hidden');
+                });
               });
           }
         }
