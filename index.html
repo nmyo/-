@@ -410,17 +410,7 @@
     }
 
     /* iOS 设备保持控制面板可见 */
-    @media screen and (-webkit-min-device-pixel-ratio: 0) {
-      /* Safari for iOS specific styles */
-      .fullscreen:not(.show-controls) .controls-panel {
-        opacity: 0.8 !important;
-        transform: translateY(0) !important;
-        pointer-events: auto !important;
-      }
-    }
-    
-    /* 使用JavaScript检测到的iOS类 */
-    .ios-device .controls-panel {
+    .ios-device .fullscreen .controls-panel {
       opacity: 0.8 !important;
       transform: translateY(0) !important;
       pointer-events: auto !important;
@@ -538,7 +528,7 @@
   
           });
         } catch (err) {
-          console.error('无法申请屏幕唤醒锁:', err);
+          // 无法申请屏幕唤醒锁
         }
       } else {
 
