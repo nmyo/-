@@ -409,13 +409,21 @@
       pointer-events: auto;
     }
 
-    /* iOS 设备不应用透明度变化 */
-    @supports (-webkit-touch-callout: none) {
-      .controls-panel {
-        opacity: 1 !important;
+    /* iOS 设备保持控制面板可见 */
+    @media screen and (-webkit-min-device-pixel-ratio: 0) {
+      /* Safari for iOS specific styles */
+      .fullscreen:not(.show-controls) .controls-panel {
+        opacity: 0.8 !important;
         transform: translateY(0) !important;
         pointer-events: auto !important;
       }
+    }
+    
+    /* 使用JavaScript检测到的iOS类 */
+    .ios-device .controls-panel {
+      opacity: 0.8 !important;
+      transform: translateY(0) !important;
+      pointer-events: auto !important;
     }
   </style>
 </head>
@@ -527,13 +535,13 @@
         try {
           wakeLock = await navigator.wakeLock.request('screen');
           wakeLock.addEventListener('release', () => {
-            console.log('屏幕唤醒锁已释放');
+  
           });
         } catch (err) {
           console.error('无法申请屏幕唤醒锁:', err);
         }
       } else {
-        console.log('屏幕唤醒锁 API 不可用');
+
       }
     }
 
@@ -643,10 +651,10 @@
           resultsList.innerHTML = '<div class="result-item">未找到相关视频</div>';
           resultsList.style.display = 'block';
         } else {
-          console.error("没有找到可播放的视频");
+
         }
       } catch (e) {
-        console.error("加载失败:", e);
+
         // 详细的错误处理
         let errorMessage = "加载失败";
         if (e.name === 'AbortError') {
@@ -767,7 +775,7 @@
                 $('centerPlayIcon').classList.add('hidden');
               })
               .catch(error => {
-                console.log('自动播放失败:', error);
+
                 // 如果自动播放失败，显示播放按钮
                 $('centerPlayIcon').classList.remove('hidden');
               });
@@ -786,11 +794,11 @@
             // 如果缓冲区未达到目标时间，则继续加载
             if (bufferedEnd < targetTime) {
               // HLS.js会自动管理缓冲区，这里主要是监控和记录
-              console.log(`已缓存至: ${bufferedEnd.toFixed(2)}秒, 目标: ${targetTime.toFixed(2)}秒`);
+
             }
           } catch(e) {
             // 处理可能的错误，例如在视频加载初期buffered.end可能不可用
-            console.log('缓冲区信息暂不可用:', e.message);
+
           }
         }
       }
@@ -882,7 +890,7 @@
           
           localStorage.setItem('video_history', JSON.stringify(history));
         } catch(e) {
-          console.error('更新播放历史时出错:', e);
+
         }
       }
     };
@@ -939,7 +947,7 @@
       try {
         await video.requestPictureInPicture();
       } catch (error) {
-        console.error('画中画启动失败:', error);
+
       }
     };
 
@@ -1079,6 +1087,11 @@
     };
 
     window.onload = () => {
+      // 为iOS设备添加特定CSS类
+      if (isIOSDevice()) {
+        document.body.classList.add('ios-device');
+      }
+      
       video.volume = 0.5;
       video.muted = true; // 初始状态静音
       updateVolUI();
