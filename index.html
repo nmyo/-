@@ -391,6 +391,32 @@
     .hidden {
       display: none !important;
     }
+
+    /* 全屏时控制面板样式 */
+    .controls-panel {
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+
+    .fullscreen .controls-panel {
+      opacity: 0;
+      transform: translateY(20px);
+      pointer-events: none;
+    }
+
+    .fullscreen.show-controls .controls-panel {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    /* iOS 设备不应用透明度变化 */
+    @supports (-webkit-touch-callout: none) {
+      .controls-panel {
+        opacity: 1 !important;
+        transform: translateY(0) !important;
+        pointer-events: auto !important;
+      }
+    }
   </style>
 </head>
 
@@ -889,6 +915,89 @@
         node.webkitRequestFullscreen();
       }
     };
+
+    // 全屏控制栏自动隐藏功能（iOS 除外）
+    let fullscreenControlsTimeout;
+    let isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    
+    // 检测是否为 iOS 设备
+    function isIOSDevice() {
+      return /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+             (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); // 支持 iPadOS
+    }
+    
+    // 显示控制栏
+    function showFullscreenControls() {
+      if (isIOSDevice()) return; // iOS 设备不执行控制栏隐藏逻辑
+      
+      const playerNode = $('playerNode');
+      playerNode.classList.add('show-controls');
+      
+      // 清除之前的定时器
+      if (fullscreenControlsTimeout) {
+        clearTimeout(fullscreenControlsTimeout);
+      }
+      
+      // 设置定时器自动隐藏控制栏
+      fullscreenControlsTimeout = setTimeout(() => {
+        if (document.fullscreenElement && !isIOSDevice()) {
+          playerNode.classList.remove('show-controls');
+        }
+      }, 3000); // 3秒后自动隐藏
+    }
+    
+    // 隐藏控制栏
+    function hideFullscreenControls() {
+      if (isIOSDevice()) return; // iOS 设备不执行控制栏隐藏逻辑
+      
+      const playerNode = $('playerNode');
+      playerNode.classList.remove('show-controls');
+      
+      // 清除定时器
+      if (fullscreenControlsTimeout) {
+        clearTimeout(fullscreenControlsTimeout);
+      }
+    }
+    
+    // 全屏状态变化事件监听
+    document.addEventListener('fullscreenchange', () => {
+      const playerNode = $('playerNode');
+      
+      if (document.fullscreenElement) {
+        // 进入全屏
+        playerNode.classList.add('fullscreen');
+        if (!isIOSDevice()) {
+          // 非 iOS 设备启用自动隐藏
+          showFullscreenControls();
+          
+          // 添加鼠标移动事件来显示控制栏
+          document.addEventListener('mousemove', showFullscreenControls);
+          document.addEventListener('touchmove', showFullscreenControls);
+          document.addEventListener('click', showFullscreenControls);
+        }
+      } else {
+        // 退出全屏
+        playerNode.classList.remove('fullscreen', 'show-controls');
+        if (!isIOSDevice()) {
+          // 移除事件监听器
+          document.removeEventListener('mousemove', showFullscreenControls);
+          document.removeEventListener('touchmove', showFullscreenControls);
+          document.removeEventListener('click', showFullscreenControls);
+          
+          // 清除定时器
+          if (fullscreenControlsTimeout) {
+            clearTimeout(fullscreenControlsTimeout);
+          }
+        }
+      }
+    });
+    
+    // 点击视频区域也显示控制栏
+    $('screen').addEventListener('click', () => {
+      if (document.fullscreenElement && !isIOSDevice()) {
+        showFullscreenControls();
+      }
+    });
 
     volSlider.oninput = (e) => { video.volume = e.target.value; video.muted = (video.volume === 0); updateVolUI(); };
     volBtn.onclick = () => { video.muted = !video.muted; updateVolUI(); };
