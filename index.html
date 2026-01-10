@@ -1102,6 +1102,29 @@
     };
     window.seek = s => video.currentTime += s;
 
+    // 页面可见性变化事件监听 - 当用户切换标签页或最小化浏览器时暂停播放
+    document.addEventListener('visibilitychange', function() {
+      if (document.hidden) {
+        // 页面变为不可见（切换到其他标签页、最小化或进入后台）
+        if (!video.paused) {
+          video.pause();
+        }
+      }
+    });
+
+    // 页面失焦时暂停播放
+    window.addEventListener('blur', function() {
+      if (!video.paused) {
+        video.pause();
+      }
+    });
+    
+    // 页面获得焦点时可以选择恢复播放（可选功能）
+    window.addEventListener('focus', function() {
+      // 可根据需求决定是否自动恢复播放
+      // video.play();
+    });
+
     window.onclick = (e) => {
       if (!e.target.closest('.search-container')) resultsList.style.display = 'none';
       $('speedMenu').classList.remove('show');
