@@ -393,6 +393,41 @@
       opacity: 1;
     }
     
+    /* 下一个视频按钮样式 */
+    .next-video-btn {
+      position: absolute;
+      right: 20px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(0, 0, 0, 0.6);
+      border-radius: 50%;
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 21;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    
+    .video-wrapper:hover .next-video-btn {
+      opacity: 1;
+    }
+    
+    /* 针对触摸设备的优化 */
+    @media (hover: none) and (pointer: coarse) {
+      .next-video-btn {
+        opacity: 0;
+      }
+      
+      .next-video-btn.force-visible {
+        opacity: 1;
+      }
+    }
+    
 
     
     /* 针对触摸设备的优化 */
@@ -436,6 +471,13 @@
             <div class="spinner"></div>
           </div>
         </div>
+        
+        <!-- 下一个视频按钮 -->
+        <button class="btn next-video-btn" id="nextVideoBtn" title="下一个视频">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="white">
+            <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
+          </svg>
+        </button>
         
         <!-- 视频内部控件 -->
         <div class="video-controls" id="videoControls">
@@ -1095,10 +1137,33 @@ function startVideo(m3u8, name, auto = true) {
         const history = JSON.parse(localStorage.getItem('video_history') || '{}');
         delete history[data.videoId]; // 播放结束后清除历史记录
         localStorage.setItem('video_history', JSON.stringify(history));
+        
+        // 将已播放的视频代码添加到排除列表中
+        if (data.m3u8) {
+          const videoCode = extractVideoCode(data.m3u8);
+          if (videoCode && !usedCodes.includes(videoCode)) {
+            usedCodes.push(videoCode);
+          }
+        }
       }
       
       playNext(); 
     };
+    
+    // 从视频URL中提取视频代码的辅助函数
+    function extractVideoCode(url) {
+      // 从URL中提取视频代码，例如从 "https://example.com/video/abc123.m3u8" 提取 "abc123"
+      const match = url.match(/\/([^\/]+\.m3u8)$/);
+      if (match) {
+        return match[1].replace('.m3u8', '');
+      }
+      // 如果上面的正则没匹配到，尝试其他常见格式
+      const fallbackMatch = url.match(/([a-zA-Z0-9_-]+\.m3u8)$/);
+      if (fallbackMatch) {
+        return fallbackMatch[1].replace('.m3u8', '');
+      }
+      return url;
+    }
 
     // 点击视频区域播放/暂停
     $('screen').onclick = (e) => {
@@ -1146,6 +1211,12 @@ function startVideo(m3u8, name, auto = true) {
     $('videoVolBtn').onclick = () => {
       video.muted = !video.muted;
       updateVolUI();
+    };
+    
+    // 下一个视频按钮点击事件
+    $('nextVideoBtn').onclick = (e) => {
+      e.stopPropagation();
+      playNext();
     };
     $('speedBtn').onclick = (e) => { e.stopPropagation(); $('speedMenu').classList.toggle('show'); };
     $('pipBtn').onclick = async () => {
@@ -1315,10 +1386,13 @@ function startVideo(m3u8, name, auto = true) {
       if (now - lastTouchTime < 300) { // 双击间隔小于300ms
         e.preventDefault();
         const videoControls = $('videoControls');
+        const nextVideoBtn = $('nextVideoBtn');
         if (videoControls && videoControls.classList.contains('visible')) {
           hideVideoControls(); // 如果控件可见则隐藏
+          if (nextVideoBtn) nextVideoBtn.classList.remove('force-visible');
         } else {
           showVideoControls(); // 如果控件隐藏则显示
+          if (nextVideoBtn) nextVideoBtn.classList.add('force-visible');
         }
         lastTouchTime = 0; // 重置双击计时
       } else {
@@ -1352,6 +1426,12 @@ function startVideo(m3u8, name, auto = true) {
           
           // 对于非双击的触摸，显示控件
           showVideoControls();
+          
+          // 显示下一个视频按钮
+          const nextVideoBtn = $('nextVideoBtn');
+          if (nextVideoBtn) {
+            nextVideoBtn.classList.add('force-visible');
+          }
         });
         
         // 在触摸设备上，当视频播放时自动隐藏控件
