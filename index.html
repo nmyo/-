@@ -8,6 +8,8 @@
   <title>Media</title>
   <meta name="referrer" content="no-referrer-when-downgrade">
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1.6.15/dist/hls.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/plyr/3.6.8/plyr.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/plyr/3.6.8/plyr.min.js"></script>
   <!-- 预加载关键资源 -->
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link rel="preconnect" href="https://apiv.nyanx.de" crossorigin>
@@ -486,7 +488,7 @@
       <div id="videoTitle">READY</div>
 
       <div class="video-wrapper" id="screen">
-        <video id="video" playsinline webkit-playsinline></video>
+        <video id="video" playsinline webkit-playsinline controls data-poster="" preload="metadata" crossorigin="anonymous" style="--plyr-color-main: #ff0000; --plyr-captions-background: rgba(0, 0, 0, 0.5);"></video>
         <div class="state-overlay">
           <div class="center-btn" id="centerPlayIcon">
             <svg viewBox="0 0 24 24" width="32" height="32" fill="white">
@@ -838,29 +840,91 @@
       }
     }
 
-    function startVideo(m3u8, name, auto = true) {
+function startVideo(m3u8, name, auto = true) {
       if (!m3u8) return;
       if (hls) hls.destroy();
       isLoaded = true;
       $('videoTitle').innerText = (name || "VIDEO").split('_')[0].toUpperCase();
       let finalUrl = m3u8.replace("https://surrit.com/", "/s1/");
-      
+
       // 创建基于URL的唯一ID用于存储播放历史
       const videoId = generateVideoId(m3u8);
-      
+
       // 获取当前网络状况并配置HLS参数
       const networkQuality = getNetworkQuality();
       const hlsConfig = getHlsConfigForNetwork(networkQuality);
-      
+
+      // 初始化Plyr播放器配置
+      const playerSettings = {
+        controls: [
+          'play-large',
+          'rewind',
+          'play', 
+          'fast-forward',
+          'progress',
+          'current-time',
+          'duration',
+          'mute',
+          'volume',
+          'pip',
+          'airplay',
+          'fullscreen'
+        ],
+        settings: ['quality', 'speed'],
+        speed: {
+          selected: 1,
+          options: [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
+        },
+        i18n: {
+          restart: '重新开始',
+          rewind: '后退{seektime}s',
+          play: '播放',
+          pause: '暂停',
+          fastForward: '快进{seektime}s',
+          seek: 'Seek',
+          played: 'Played',
+          buffered: 'Buffered',
+          currentTime: '当前时间',
+          duration: '总时长',
+          volume: '音量',
+          mute: '静音',
+          unmute: '取消静音',
+          enableCaptions: '开启字幕',
+          disableCaptions: '关闭字幕',
+          download: '下载',
+          enterFullscreen: '进入全屏',
+          exitFullscreen: '退出全屏',
+          frameTitle: '播放器窗口',
+          captions: '字幕',
+          settings: '设置',
+          speed: '速度',
+          quality: '画质',
+          loop: '循环播放',
+          start: '开始',
+          end: '结束',
+          all: '全部',
+          reset: '重置',
+          disabled: '关闭',
+          advertisement: '广告'
+        }
+      };
+
       const setup = () => {
+        // 初始化Plyr播放器
+        if (window.player) {
+          window.player.destroy();
+        }
+        
+        window.player = new Plyr(video, playerSettings);
+        
         video.volume = volSlider.value;
         video.muted = true; // 确保每次加载视频时都是静音状态
         updateVolUI();
-        
+
         // 移动端性能优化
         video.setAttribute('playsinline', '');
         video.setAttribute('webkit-playsinline', '');
-        
+
         // 尝试从本地存储恢复播放位置
         const history = JSON.parse(localStorage.getItem('video_history') || '{}');
         if (history[videoId]) {
@@ -872,7 +936,7 @@
             video.currentTime = savedPosition;
           }
         }
-        
+
         // 监听元数据加载完成事件，此时可以获取准确的持续时间
         if (Hls.isSupported()) {
           // 在HLS模式下，我们监听LEVEL_LOADED事件来确认已缓存足够内容
@@ -880,7 +944,7 @@
             // 预缓存30秒内容
             preloadTimeRange(30);
           });
-          
+
           // 监听缓冲区更新事件，持续确保有足够的预加载内容
           hls.on(Hls.Events.BUFFER_APPENDED, () => {
             preloadTimeRange(30);
@@ -890,13 +954,13 @@
           video.addEventListener('loadeddata', () => {
             preloadTimeRange(30);
           });
-          
+
           // 监听时间更新，确保缓冲区充足
           video.addEventListener('timeupdate', () => {
             preloadTimeRange(30);
           });
         }
-        
+
         if (auto) {
           // 移动端优化：先静音播放以绕过自动播放限制
           video.muted = true;
@@ -928,7 +992,7 @@
           }
         }
       };
-      
+
       // 预缓存指定时间段的函数
       function preloadTimeRange(secondsToPreload) {
         // 这个函数用于确保指定秒数的内容已被缓冲
@@ -936,7 +1000,7 @@
           try {
             const bufferedEnd = video.buffered.end(video.buffered.length - 1);
             const targetTime = Math.min(video.duration || Infinity, video.currentTime + secondsToPreload);
-            
+
             // 如果缓冲区未达到目标时间，则继续加载
             if (bufferedEnd < targetTime) {
               // HLS.js会自动管理缓冲区，这里主要是监控和记录
@@ -948,7 +1012,7 @@
           }
         }
       }
-      
+
       // 生成视频的唯一ID用于存储播放历史
       function generateVideoId(url) {
         // 简单的哈希函数生成唯一ID
@@ -960,22 +1024,18 @@
         }
         return url.length + '_' + Math.abs(hash).toString(36);
       }
-      
+
       if (Hls.isSupported()) {
-        hls = new Hls(hlsConfig); 
-        hls.loadSource(finalUrl); 
+        hls = new Hls(hlsConfig);
+        hls.loadSource(finalUrl);
         hls.attachMedia(video);
         hls.on(Hls.Events.MANIFEST_PARSED, setup);
       } else {
-        video.src = finalUrl; 
+        video.src = finalUrl;
         video.onloadedmetadata = setup;
       }
       localStorage.setItem('current_video', JSON.stringify({ m3u8, name, videoId }));
     }
-
-    let wrapRect = null;
-    let videoWrapRect = null;
-    
     const handleProgress = (e, isFinal = false, targetWrap = null) => {
       const clientX = e.touches ? e.touches[0].clientX : e.clientX;
       const rect = targetWrap || wrapRect;
