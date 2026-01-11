@@ -1328,14 +1328,12 @@ function startVideo(m3u8, name, auto = true) {
     });
     */
 
-    // 页面失焦时暂停播放 - 已禁用自动暂停功能
-    /*
+    // 页面失焦时暂停播放
     window.addEventListener('blur', function() {
       if (!video.paused) {
         video.pause();
       }
     });
-    */
     
     // 页面获得焦点时可以选择恢复播放（已禁用自动播放功能）
     /*
