@@ -517,9 +517,9 @@
     /* 音量控制条样式 */
     .volume-control {
       position: absolute;
-      top: -100px;  /* 位于音量按钮上方 */
-      left: 50%;
-      transform: translateX(-50%);
+      top: 0;
+      left: 100%;
+      margin-left: 8px;
       width: 30px;
       height: 80px;
       background: var(--panel-bg);
@@ -536,7 +536,7 @@
       display: block;
     }
     
-    /* 确保音量控制条在音量按钮正上方 */
+    /* 确保音量按钮容器相对定位以容纳音量控制条 */
     #videoVolBtn {
       position: relative;
     }
