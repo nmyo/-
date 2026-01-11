@@ -183,53 +183,11 @@
       perspective: 1000;
     }
 
-    .controls-panel {
-      width: 100%;
-      background: var(--panel-bg);
-      backdrop-filter: blur(25px);
-      -webkit-backdrop-filter: blur(25px);
-      padding: 16px;
-      margin-top: 15px;
-      border-radius: 20px;
-      border: 1px solid var(--border-light);
-    }
-
-    .progress-wrapper {
-      width: 100%;
-      height: 20px;
-      display: flex;
-      align-items: center;
-      cursor: pointer;
-      touch-action: none;
-    }
-
-    .progress-container {
-      width: 100%;
-      height: 5px;
-      background: rgba(255, 255, 255, 0.1);
-      position: relative;
-      border-radius: 3px;
-      overflow: hidden;
-    }
-
-    .progress-buffer {
-      position: absolute;
-      height: 100%;
-      background: rgba(255, 255, 255, 0.15);
-    }
-
-    .progress-bar {
-      height: 100%;
-      background: var(--yt-red);
-      width: 0%;
-      position: relative;
-    }
-
     .seek-row {
-      display: grid;
-      grid-template-columns: repeat(6, 1fr);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
       gap: 6px;
-      margin: 10px 0 15px;
     }
 
     .seek-btn {
@@ -247,13 +205,6 @@
       transform: scale(0.92);
       background: rgba(255, 255, 255, 0.2);
       color: #fff;
-    }
-
-    .bottom-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      height: 40px;
     }
 
     .btn-group {
@@ -569,18 +520,23 @@
 
 
       <!-- 功能按钮组 -->
-      <div style="display: flex; justify-content: center; gap: 20px; margin-top: 20px; padding: 0 20px;">
-        <button class="btn" id="playBtn">
-          <svg id="pIcon" viewBox="0 0 24 24">
-            <path d="M8 5v14l11-7z" />
-          </svg>
-        </button>
-        <button class="btn" id="nextBtn">
-          <svg viewBox="0 0 24 24">
-            <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
-          </svg>
-        </button>
-        <div class="seek-row">
+      <div style="display: flex; justify-content: center; gap: 15px; margin-top: 20px; padding: 0 20px; flex-wrap: wrap;">
+        <!-- 播放控制按钮 -->
+        <div class="btn-group">
+          <button class="btn" id="playBtn">
+            <svg id="pIcon" viewBox="0 0 24 24">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+          </button>
+          <button class="btn" id="nextBtn">
+            <svg viewBox="0 0 24 24">
+              <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
+            </svg>
+          </button>
+        </div>
+        
+        <!-- 快进快退按钮 -->
+        <div class="seek-row" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 6px;">
           <button class="seek-btn" onclick="window.seek(-600)">-10m</button>
           <button class="seek-btn" onclick="window.seek(-60)">-1m</button>
           <button class="seek-btn" onclick="window.seek(-10)">-10s</button>
@@ -588,11 +544,16 @@
           <button class="seek-btn" onclick="window.seek(60)">+1m</button>
           <button class="seek-btn" onclick="window.seek(600)">+10m</button>
         </div>
-        <div style="display: flex; align-items: center; gap: 10px;">
+        
+        <!-- 音量控制 -->
+        <div class="btn-group" style="display: flex; align-items: center; gap: 8px;">
           <button class="btn" id="volBtn"><svg id="vIcon" viewBox="0 0 24 24"></svg></button>
           <input type="range" id="volSlider" min="0" max="1" step="0.01" value="0.5" style="width: 80px;">
+          <span id="timeBox" style="min-width: 100px; text-align: center; color: #999; font-size: 14px; margin-left: 10px;">0:00 / 0:00</span>
         </div>
-        <div style="display: flex; align-items: center; gap: 10px; position: relative;">
+        
+        <!-- 速度和其他控制 -->
+        <div class="btn-group" style="display: flex; align-items: center; gap: 10px; position: relative;">
           <div class="speed-menu" id="speedMenu">
             <div class="speed-item" data-val="0.5">0.5x</div>
             <div class="speed-item active" data-val="1.0">1.0x</div>
@@ -612,7 +573,6 @@
             </svg>
           </button>
         </div>
-        <span id="timeBox" style="min-width: 100px; text-align: center; line-height: 40px; color: #999; font-size: 14px;">0:00 / 0:00</span>
       </div>
     </div>
   </div>
