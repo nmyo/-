@@ -517,7 +517,7 @@
     /* 音量控制条样式 */
     .volume-control {
       position: absolute;
-      top: -100px;
+      top: -100px;  /* 位于音量按钮上方 */
       left: 50%;
       transform: translateX(-50%);
       width: 30px;
@@ -534,6 +534,11 @@
     
     #videoVolBtn:hover .volume-control {
       display: block;
+    }
+    
+    /* 确保音量控制条在音量按钮正上方 */
+    #videoVolBtn {
+      position: relative;
     }
     
     .volume-slider-container {
@@ -1443,11 +1448,6 @@ function startVideo(m3u8, name, auto = true) {
         video.muted = !video.muted;
         updateVolUI();
       };
-      
-      // 悬停事件已经在CSS中处理，但需要确保点击不会隐藏
-      $('videoVolBtn').addEventListener('click', (e) => {
-        e.stopPropagation();
-      });
     }
     
     // 下一个视频按钮点击事件
