@@ -423,7 +423,7 @@
       <div id="videoTitle">READY</div>
 
       <div class="video-wrapper" id="screen">
-        <video id="video" playsinline webkit-playsinline controls data-poster="" preload="metadata" crossorigin="anonymous" style="--plyr-color-main: #ff0000; --plyr-captions-background: rgba(0, 0, 0, 0.5);"></video>
+        <video id="video" playsinline webkit-playsinline data-poster="" preload="metadata" crossorigin="anonymous" style="--plyr-color-main: #ff0000; --plyr-captions-background: rgba(0, 0, 0, 0.5);"></video>
         <div class="state-overlay">
           <div class="center-btn" id="centerPlayIcon">
             <svg viewBox="0 0 24 24" width="32" height="32" fill="white">
@@ -446,6 +446,7 @@
           
           <div class="video-bottom-controls">
             <div class="btn-group" style="display: flex; align-items: center; gap: 8px;">
+              <div class="video-time-display" id="videoTimeDisplay">0:00 / 0:00</div>
               <button class="video-play-btn" id="videoPlayBtn">
                 <svg id="videoPIcon" viewBox="0 0 24 24">
                   <path d="M8 5v14l11-7z" />
@@ -1209,10 +1210,12 @@ function startVideo(m3u8, name, auto = true) {
       
       // 设置新的定时器来隐藏控件
       hideControlsTimeout = setTimeout(() => {
-        const videoControls = $('videoControls');
-        if (videoControls) {
-          videoControls.classList.remove('visible');
-          videoControls.classList.remove('force-visible');
+        if (!video.paused) { // 只有在播放状态下才自动隐藏
+          const videoControls = $('videoControls');
+          if (videoControls) {
+            videoControls.classList.remove('visible');
+            videoControls.classList.remove('force-visible');
+          }
         }
       }, 3000); // 3秒后自动隐藏
     }
@@ -1224,6 +1227,29 @@ function startVideo(m3u8, name, auto = true) {
         videoControls.classList.remove('force-visible');
       }
     }
+    
+    // 触摸设备上双击视频区域显示/隐藏控件
+    let lastTouchTime = 0;
+    $('screen').addEventListener('touchend', (e) => {
+      // 避免与播放/暂停按钮冲突
+      if (e.target.closest('.video-play-btn, .btn')) {
+        return;
+      }
+      
+      const now = new Date().getTime();
+      if (now - lastTouchTime < 300) { // 双击间隔小于300ms
+        e.preventDefault();
+        const videoControls = $('videoControls');
+        if (videoControls && videoControls.classList.contains('visible')) {
+          hideVideoControls(); // 如果控件可见则隐藏
+        } else {
+          showVideoControls(); // 如果控件隐藏则显示
+        }
+        lastTouchTime = 0; // 重置双击计时
+      } else {
+        lastTouchTime = now;
+      }
+    });
     
     window.onload = () => {
       // 为iOS设备添加特定CSS类
@@ -1244,11 +1270,12 @@ function startVideo(m3u8, name, auto = true) {
         
         // 触摸事件显示控件
         screen.addEventListener('touchstart', (e) => {
-          // 防止与播放/暂停功能冲突
-          if (e.target.closest('.video-play-btn')) {
-            return; // 如果点击的是播放按钮，不触发显示控件
+          // 避免与播放/暂停按钮和双击功能冲突
+          if (e.target.closest('.video-play-btn, .btn')) {
+            return; // 如果点击的是按钮，不触发显示控件
           }
           
+          // 对于非双击的触摸，显示控件
           showVideoControls();
         });
         
