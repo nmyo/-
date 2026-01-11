@@ -513,6 +513,103 @@
     video::backdrop {
       background: #000;
     }
+    
+    /* 音量控制条样式 */
+    .volume-control {
+      position: absolute;
+      top: -100px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 30px;
+      height: 80px;
+      background: var(--panel-bg);
+      border-radius: 10px;
+      padding: 10px 5px;
+      display: none;
+      z-index: 100;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    
+    #videoVolBtn:hover .volume-control {
+      display: block;
+    }
+    
+    .volume-slider-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+    
+    .volume-slider {
+      position: absolute;
+      width: 6px;
+      height: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      -webkit-appearance: none;
+      appearance: none;
+      background: transparent;
+      outline: none;
+      z-index: 2;
+    }
+    
+    .volume-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #fff;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    
+    .volume-slider:hover::-webkit-slider-thumb,
+    .volume-slider:focus::-webkit-slider-thumb {
+      opacity: 1;
+    }
+    
+    .volume-slider::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #fff;
+      cursor: pointer;
+      border: none;
+    }
+    
+    .volume-track {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 4px;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 2px;
+      z-index: 0;
+    }
+    
+    .volume-level {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 4px;
+      bottom: 0;
+      background: var(--yt-red);
+      border-radius: 2px;
+      z-index: 1;
+      height: 50%;
+    }
+    
+    /* 移动端适配：显示音量滑块拇指以便点击 */
+    @media (hover: none) and (pointer: coarse) {
+      .volume-slider::-webkit-slider-thumb {
+        opacity: 1;
+      }
+    }
   </style>
 </head>
 
@@ -568,10 +665,18 @@
                   <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
                 </svg>
               </button>
-              <button class="btn" id="videoVolBtn">
+              <button class="btn" id="videoVolBtn" aria-label="音量控制">
                 <svg id="videoVIcon" viewBox="0 0 24 24">
                   <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
                 </svg>
+                <!-- 音量控制条 -->
+                <div class="volume-control" id="volumeControl">
+                  <div class="volume-slider-container">
+                    <input type="range" id="volumeSlider" class="volume-slider" min="0" max="1" step="0.01" value="0.5" orient="vertical">
+                    <div class="volume-track"></div>
+                    <div class="volume-level" id="volumeLevel"></div>
+                  </div>
+                </div>
               </button>
             </div>
             <div class="btn-group" style="display: flex; align-items: center; gap: 10px; position: relative;">
@@ -1279,11 +1384,71 @@ function startVideo(m3u8, name, auto = true) {
         playNext(); // 只有在未加载任何视频时才调用playNext
       }
     };
-    // 内部音量按钮点击事件
-    $('videoVolBtn').onclick = () => {
-      video.muted = !video.muted;
+    // 音量控制功能
+    const volumeSlider = $('volumeSlider');
+    const volumeLevel = $('volumeLevel');
+    const volumeControl = $('volumeControl');
+    let isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    
+    // 更新音量UI显示
+    function updateVolumeUI() {
+      const volume = video.muted ? 0 : video.volume;
+      volumeSlider.value = volume;
+      volumeLevel.style.height = (volume * 100) + '%';
       updateVolUI();
+    }
+    
+    // 设置音量
+    function setVolume(volume) {
+      video.volume = volume;
+      video.muted = (volume === 0);
+      updateVolumeUI();
+    }
+    
+    // 初始化音量
+    volumeSlider.value = video.volume;
+    volumeLevel.style.height = (video.volume * 100) + '%';
+    
+    // 音量滑块事件
+    volumeSlider.oninput = function() {
+      setVolume(parseFloat(this.value));
     };
+    
+    // 音量变化事件
+    video.addEventListener('volumechange', updateVolumeUI);
+    
+    // 检测设备类型并设置音量按钮行为
+    if (isTouchDevice) {
+      // 移动端：点击显示/隐藏音量控制
+      $('videoVolBtn').onclick = (e) => {
+        e.stopPropagation();
+        // 切换静音状态
+        video.muted = !video.muted;
+        updateVolUI();
+        
+        // 显示音量控制条
+        volumeControl.style.display = volumeControl.style.display === 'block' ? 'none' : 'block';
+      };
+      
+      // 点击其他地方隐藏音量控制
+      document.addEventListener('click', (e) => {
+        if (!e.target.closest('#videoVolBtn')) {
+          volumeControl.style.display = 'none';
+        }
+      });
+    } else {
+      // PC端：点击切换静音，悬停显示音量控制
+      $('videoVolBtn').onclick = (e) => {
+        e.stopPropagation();
+        video.muted = !video.muted;
+        updateVolUI();
+      };
+      
+      // 悬停事件已经在CSS中处理，但需要确保点击不会隐藏
+      $('videoVolBtn').addEventListener('click', (e) => {
+        e.stopPropagation();
+      });
+    }
     
     // 下一个视频按钮点击事件
     $('nextVideoBtn').onclick = (e) => {
