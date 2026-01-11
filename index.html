@@ -1176,8 +1176,8 @@ function startVideo(m3u8, name, auto = true) {
 
     // 点击视频区域播放/暂停
     $('screen').onclick = (e) => {
-      // 如果点击的是内部按钮，不执行此操作（防止重复）
-      if (e.target.closest('#videoPlayBtn, #videoVolBtn, #speedBtn, #pipBtn, #fullBtn')) {
+      // 如果点击的是内部按钮或控制栏元素，不执行播放/暂停操作
+      if (e.target.closest('#videoPlayBtn, #videoVolBtn, #speedBtn, #pipBtn, #fullBtn, #videoControls, .video-controls, .video-progress-wrapper, .video-bottom-controls, .btn-group, .video-time-display, .speed-menu, .speed-item')) {
         return;
       }
       if (isLoaded) {
