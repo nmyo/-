@@ -419,6 +419,116 @@
       border-radius: 20px;
       border: 1px solid var(--border-light);
     }
+    
+    /* 视频内部控件样式 */
+    .video-controls {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: linear-gradient(to top, rgba(0, 0, 0, 0.7), transparent);
+      padding: 20px 16px 12px;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      z-index: 20;
+    }
+    
+    .video-controls.visible {
+      opacity: 1;
+    }
+    
+    .video-progress-wrapper {
+      width: 100%;
+      height: 3px;
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      touch-action: none;
+      margin-bottom: 12px;
+    }
+    
+    .video-progress-container {
+      width: 100%;
+      height: 3px;
+      background: rgba(255, 255, 255, 0.3);
+      position: relative;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    
+    .video-progress-buffer {
+      position: absolute;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.5);
+    }
+    
+    .video-progress-bar {
+      height: 100%;
+      background: var(--yt-red);
+      width: 0%;
+      position: relative;
+    }
+    
+    .video-bottom-controls {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .video-time-display {
+      font-size: 12px;
+      color: #fff;
+      font-variant-numeric: tabular-nums;
+      margin-right: 10px;
+    }
+    
+    .video-play-btn {
+      background: transparent;
+      border: none;
+      color: #fff;
+      cursor: pointer;
+      padding: 5px;
+      display: flex;
+      align-items: center;
+      transition: 0.1s;
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .video-play-btn:active {
+      transform: scale(0.85);
+      opacity: 0.7;
+    }
+    
+    .video-play-btn svg {
+      width: 20px;
+      height: 20px;
+      fill: currentColor;
+    }
+    
+    /* 视频区域悬停效果 */
+    .video-wrapper:hover .video-controls {
+      opacity: 1;
+    }
+    
+    /* 隐藏外部进度条 */
+    .controls-panel .progress-wrapper {
+      display: none;
+    }
+    
+    /* 针对触摸设备的优化 */
+    @media (hover: none) and (pointer: coarse) {
+      .video-controls {
+        opacity: 0;
+      }
+      
+      .video-controls.force-visible {
+        opacity: 1;
+      }
+    }
   </style>
 </head>
 
@@ -448,6 +558,25 @@
           </div>
           <div id="loader" class="hidden">
             <div class="spinner"></div>
+          </div>
+        </div>
+        
+        <!-- 视频内部控件 -->
+        <div class="video-controls" id="videoControls">
+          <div class="video-progress-wrapper" id="videoProgressWrap">
+            <div class="video-progress-container">
+              <div class="video-progress-buffer" id="videoBufferBar"></div>
+              <div class="video-progress-bar" id="videoProgressBar"></div>
+            </div>
+          </div>
+          
+          <div class="video-bottom-controls">
+            <div class="video-time-display" id="videoTimeDisplay">0:00 / 0:00</div>
+            <button class="video-play-btn" id="videoPlayBtn">
+              <svg id="videoPIcon" viewBox="0 0 24 24">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+            </button>
           </div>
         </div>
       </div>
@@ -911,11 +1040,20 @@
     }
 
     let wrapRect = null;
+    let videoWrapRect = null;
     
-    const handleProgress = (e, isFinal = false) => {
+    const handleProgress = (e, isFinal = false, targetWrap = null) => {
       const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-      const p = Math.max(0, Math.min(1, (clientX - wrapRect.left) / wrapRect.width));
+      const rect = targetWrap || wrapRect;
+      const p = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+      
+      // 更新外部进度条
       bar.style.width = (p * 100) + "%";
+      // 更新内部进度条
+      if (typeof $('videoProgressBar') !== 'undefined' && $('videoProgressBar')) {
+        $('videoProgressBar').style.width = (p * 100) + "%";
+      }
+      
       if (isFinal) video.currentTime = p * video.duration;
     };
 
@@ -924,6 +1062,16 @@
       wrapRect = wrap.getBoundingClientRect();
       handleProgress(e);
     };
+    
+    // 内部进度条的鼠标事件处理
+    const videoProgressWrap = $('videoProgressWrap');
+    if (videoProgressWrap) {
+      videoProgressWrap.onmousedown = (e) => {
+        isDragging = true;
+        videoWrapRect = videoProgressWrap.getBoundingClientRect();
+        handleProgress(e, false, videoWrapRect);
+      };
+    }
     
     window.onmousemove = (e) => {
       if (isDragging) handleProgress(e);
@@ -942,6 +1090,15 @@
       handleProgress(e);
     };
     
+    // 内部进度条的触摸事件处理
+    if (videoProgressWrap) {
+      videoProgressWrap.ontouchstart = (e) => {
+        isDragging = true;
+        videoWrapRect = videoProgressWrap.getBoundingClientRect();
+        handleProgress(e, false, videoWrapRect);
+      };
+    }
+    
     wrap.ontouchmove = (e) => {
       if (isDragging) {
         e.preventDefault();
@@ -949,12 +1106,32 @@
       }
     };
     
+    // 内部进度条的触摸移动事件处理
+    if (videoProgressWrap) {
+      videoProgressWrap.ontouchmove = (e) => {
+        if (isDragging) {
+          e.preventDefault();
+          handleProgress(e, false, videoWrapRect);
+        }
+      };
+    }
+    
     wrap.ontouchend = (e) => {
       if (isDragging) {
         isDragging = false;
         handleProgress(e, true);
       }
     };
+    
+    // 内部进度条的触摸结束事件处理
+    if (videoProgressWrap) {
+      videoProgressWrap.ontouchend = (e) => {
+        if (isDragging) {
+          isDragging = false;
+          handleProgress(e, true, videoWrapRect);
+        }
+      };
+    }
 
     video.ontimeupdate = () => {
       // 保存播放历史
@@ -980,6 +1157,7 @@
 
     video.onplaying = () => {
       $('pIcon').innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+      $('videoPIcon').innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
       $('centerPlayIcon').classList.add('hidden');
       // 视频播放时申请屏幕唤醒锁
       requestWakeLock();
@@ -988,11 +1166,19 @@
           if (video.duration && video.duration > 0) {
             bar.style.width = (video.currentTime / video.duration * 100) + "%";
             if (video.buffered.length) buf.style.width = (video.buffered.end(video.buffered.length - 1) / video.duration * 100) + "%";
+            
+            // 更新内部进度条
+            $('videoProgressBar').style.width = (video.currentTime / video.duration * 100) + "%";
+            if (video.buffered.length) $('videoBufferBar').style.width = (video.buffered.end(video.buffered.length - 1) / video.duration * 100) + "%";
           } else {
             bar.style.width = "0%";
             buf.style.width = "0%";
+            $('videoProgressBar').style.width = "0%";
+            $('videoBufferBar').style.width = "0%";
           }
-          $('timeBox').innerText = `${fmt(video.currentTime)} / ${fmt(video.duration)}`;
+          const timeText = `${fmt(video.currentTime)} / ${fmt(video.duration)}`;
+          $('timeBox').innerText = timeText;
+          $('videoTimeDisplay').innerText = timeText;
           requestAnimationFrame(up);
         }
       };
@@ -1002,6 +1188,7 @@
     video.onpause = () => {
       if (isLoaded) $('centerPlayIcon').classList.remove('hidden');
       $('pIcon').innerHTML = '<path d="M8 5v14l11-7z"/>';
+      $('videoPIcon').innerHTML = '<path d="M8 5v14l11-7z"/>';
       // 视频暂停时释放屏幕唤醒锁
       releaseWakeLock();
     };
@@ -1024,6 +1211,7 @@
 
     $('screen').onclick = () => isLoaded ? (video.paused ? video.play() : video.pause()) : playNext();
     $('playBtn').onclick = () => isLoaded ? (video.paused ? video.play() : video.pause()) : playNext();
+    $('videoPlayBtn').onclick = () => isLoaded ? (video.paused ? video.play() : video.pause()) : playNext();
     $('nextBtn').onclick = () => playNext();
     $('speedBtn').onclick = (e) => { e.stopPropagation(); $('speedMenu').classList.toggle('show'); };
     $('pipBtn').onclick = async () => {
@@ -1130,10 +1318,84 @@
       $('speedMenu').classList.remove('show');
     };
 
+    // 视频控件自动隐藏功能
+    let hideControlsTimeout;
+    
+    function showVideoControls() {
+      const videoControls = $('videoControls');
+      if (videoControls) {
+        videoControls.classList.add('visible');
+        
+        // 对于触摸设备，使用force-visible类
+        if (window.matchMedia('(hover: none) and (pointer: coarse)').matches) {
+          videoControls.classList.add('force-visible');
+        }
+      }
+      
+      // 清除之前的定时器
+      if (hideControlsTimeout) {
+        clearTimeout(hideControlsTimeout);
+      }
+      
+      // 设置新的定时器来隐藏控件
+      hideControlsTimeout = setTimeout(() => {
+        const videoControls = $('videoControls');
+        if (videoControls) {
+          videoControls.classList.remove('visible');
+          videoControls.classList.remove('force-visible');
+        }
+      }, 3000); // 3秒后自动隐藏
+    }
+    
+    function hideVideoControls() {
+      const videoControls = $('videoControls');
+      if (videoControls) {
+        videoControls.classList.remove('visible');
+        videoControls.classList.remove('force-visible');
+      }
+    }
+    
     window.onload = () => {
       // 为iOS设备添加特定CSS类
       if (isIOSDevice()) {
         document.body.classList.add('ios-device');
+      }
+      
+      // 添加视频区域的触摸和鼠标事件监听器
+      const screen = $('screen');
+      if (screen) {
+        // 鼠标移动事件显示控件
+        screen.addEventListener('mousemove', showVideoControls);
+        screen.addEventListener('mouseleave', () => {
+          if (!video.paused) {
+            setTimeout(hideVideoControls, 1000); // 鼠标离开后短暂延迟隐藏
+          }
+        });
+        
+        // 触摸事件显示控件
+        screen.addEventListener('touchstart', (e) => {
+          // 防止与播放/暂停功能冲突
+          if (e.target.closest('.video-play-btn')) {
+            return; // 如果点击的是播放按钮，不触发显示控件
+          }
+          
+          showVideoControls();
+        });
+        
+        // 在触摸设备上，当视频播放时自动隐藏控件
+        if (window.matchMedia('(hover: none) and (pointer: coarse)').matches) {
+          video.addEventListener('play', () => {
+            setTimeout(() => {
+              if (!video.paused) {
+                hideVideoControls();
+              }
+            }, 3000); // 播放开始后3秒自动隐藏
+          });
+          
+          video.addEventListener('pause', () => {
+            showVideoControls(); // 暂停时显示控件
+          });
+        }
       }
       
       video.volume = 0.5;
