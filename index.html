@@ -470,11 +470,43 @@
       max-height: 100%;
       border-radius: 0;
       aspect-ratio: inherit;
+      position: fixed;
+      top: 0;
+      left: 0;
     }
     
     video:-webkit-full-screen {
       width: 100% !important;
       height: 100% !important;
+      object-fit: contain;
+    }
+    
+    /* 强制视频在全屏模式下占满容器 */
+    .video-wrapper.fullscreen video {
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: contain;
+    }
+    
+    /* 对于全屏API激活的情况 */
+    .player-stabilizer:fullscreen .video-wrapper {
+      width: 100%;
+      height: 100%;
+    }
+    
+    .player-stabilizer:fullscreen .video-wrapper video {
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: contain;
+    }
+    
+    /* 修正：当播放器处于全屏模式时，确保视频填充整个容器 */
+    .player-stabilizer.fullscreen .video-wrapper,
+    .player-stabilizer.fullscreen video {
+      width: 100% !important;
+      height: 100% !important;
+      max-width: 100%;
+      max-height: 100%;
       object-fit: contain;
     }
     
@@ -1267,44 +1299,59 @@ function startVideo(m3u8, name, auto = true) {
       }
     };
 
-    // 修复 iOS 全屏
+    // 修复全屏功能
     $('fullBtn').onclick = () => {
       const node = $('playerNode');
       if (document.fullscreenElement) {
         document.exitFullscreen();
       } else if (video.webkitEnterFullscreen) {
-        // iOS iPhone 专用
+        // iOS iPhone 专用 - iOS系统会自动处理全屏
         video.webkitEnterFullscreen();
       } else if (node.requestFullscreen) {
+        // 优先让播放器节点全屏，这样可以保留自定义控件
         node.requestFullscreen();
       } else if (node.webkitRequestFullscreen) {
         node.webkitRequestFullscreen();
+      } else if (video.requestFullscreen) {
+        // 后备方案：让视频元素全屏
+        video.requestFullscreen();
       }
     };
     
     // 全屏状态变化事件监听
     document.addEventListener('fullscreenchange', () => {
       const playerNode = $('playerNode');
+      const videoWrapper = $('screen');
       
       if (document.fullscreenElement) {
-        // 进入全屏
-        playerNode.classList.add('fullscreen');
+        // 进入全屏 - 检查是否是我们期望的元素进入全屏
+        if (document.fullscreenElement === playerNode || document.fullscreenElement === videoWrapper || document.fullscreenElement === video) {
+          playerNode.classList.add('fullscreen');
+          videoWrapper.classList.add('fullscreen');
+        }
       } else {
         // 退出全屏
         playerNode.classList.remove('fullscreen');
+        videoWrapper.classList.remove('fullscreen');
       }
     });
     
     // WebKit 全屏变化事件监听（兼容 Safari 和 Chrome 早期版本）
     document.addEventListener('webkitfullscreenchange', () => {
       const playerNode = $('playerNode');
+      const videoWrapper = $('screen');
       
       if (document.webkitFullscreenElement || document.webkitCurrentFullScreenElement) {
-        // 进入全屏
-        playerNode.classList.add('fullscreen');
+        const fullscreenElement = document.webkitFullscreenElement || document.webkitCurrentFullScreenElement;
+        // 进入全屏 - 检查是否是我们期望的元素进入全屏
+        if (fullscreenElement === playerNode || fullscreenElement === videoWrapper || fullscreenElement === video) {
+          playerNode.classList.add('fullscreen');
+          videoWrapper.classList.add('fullscreen');
+        }
       } else {
         // 退出全屏
         playerNode.classList.remove('fullscreen');
+        videoWrapper.classList.remove('fullscreen');
       }
     });
 
