@@ -192,22 +192,7 @@
       gap: 6px;
     }
 
-    .seek-btn {
-      background: rgba(255, 255, 255, 0.08);
-      border: none;
-      color: #bbb;
-      padding: 10px 0;
-      font-size: 10px;
-      border-radius: 10px;
-      font-weight: 700;
-      transition: all 0.1s var(--ease-click);
-    }
 
-    .seek-btn:active {
-      transform: scale(0.92);
-      background: rgba(255, 255, 255, 0.2);
-      color: #fff;
-    }
 
     .btn-group {
       display: flex;
@@ -237,57 +222,7 @@
       fill: currentColor;
     }
 
-    #volSlider {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 70px;
-      height: 4px;
-      background: rgba(255, 255, 255, 0.2);
-      border-radius: 2px;
-      outline: none;
-      cursor: pointer;
-    }
 
-    #volSlider::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 12px;
-      height: 12px;
-      background: #fff;
-      border-radius: 50%;
-    }
-
-    #volSlider::-moz-range-thumb {
-      width: 12px;
-      height: 12px;
-      background: #fff;
-      border-radius: 50%;
-      border: none;
-    }
-
-    #volSlider::-moz-range-track {
-      width: 100%;
-      height: 4px;
-      background: rgba(255, 255, 255, 0.2);
-      border-radius: 2px;
-    }
-
-    /* 移动端隐藏音量条 */
-    @media (max-width: 768px) {
-      #volSlider {
-        display: none !important;
-      }
-
-      .btn-group {
-        gap: 8px;
-      }
-    }
-
-    #timeBox {
-      font-size: 12px;
-      color: #999;
-      font-variant-numeric: tabular-nums;
-    }
 
     #speedBtn {
       border: 1px solid rgba(255, 255, 255, 0.2);
@@ -543,45 +478,14 @@
 
 
       <!-- 功能按钮组 -->
-      <div style="display: flex; justify-content: center; gap: 15px; margin-top: 20px; padding: 0 20px; flex-wrap: wrap;">
-        <!-- 播放控制按钮 -->
-        <div class="btn-group">
-          <button class="btn" id="playBtn">
-            <svg id="pIcon" viewBox="0 0 24 24">
-              <path d="M8 5v14l11-7z" />
-            </svg>
-          </button>
-          <button class="btn" id="nextBtn">
-            <svg viewBox="0 0 24 24">
-              <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
-            </svg>
-          </button>
-        </div>
-        
-        <!-- 快进快退按钮 -->
-        <div class="seek-row" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 6px;">
-          <button class="seek-btn" onclick="window.seek(-600)">-10m</button>
-          <button class="seek-btn" onclick="window.seek(-60)">-1m</button>
-          <button class="seek-btn" onclick="window.seek(-10)">-10s</button>
-          <button class="seek-btn" onclick="window.seek(10)">+10s</button>
-          <button class="seek-btn" onclick="window.seek(60)">+1m</button>
-          <button class="seek-btn" onclick="window.seek(600)">+10m</button>
-        </div>
-        
-        <!-- 音量控制和时间显示 -->
-        <div class="btn-group" style="display: flex; align-items: center; gap: 8px;">
-          <button class="btn" id="volBtn"><svg id="vIcon" viewBox="0 0 24 24"></svg></button>
-          <input type="range" id="volSlider" min="0" max="1" step="0.01" value="0.5" style="width: 80px;">
-          <span id="timeBox" style="min-width: 100px; text-align: center; color: #999; font-size: 14px;">0:00 / 0:00</span>
-        </div>
-      </div>
+
     </div>
   </div>
 
   <script>
     const $ = id => document.getElementById(id);
     const video = $('video'), bar = $('progressBar'), buf = $('bufferBar'), wrap = $('progressWrap');
-    const volSlider = $('volSlider'), volBtn = $('volBtn'), searchInput = $('searchInput'), resultsList = $('resultsList');
+    const searchInput = $('searchInput'), resultsList = $('resultsList');
 
     let hls = null, isDragging = false, isLoaded = false;
     let usedCodes = [];
@@ -734,15 +638,14 @@
 
     function updateVolUI() {
       const v = video.volume, m = video.muted;
-      const vIcon = $('vIcon');
       if (m || v === 0) {
-        vIcon.innerHTML = '<path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.39-.81.62-1.72.62-2.7 0-3.17-2.11-5.85-5-6.71v2.06c1.38.86 2.31 2.36 2.31 4.1s-.93 3.24-2.31 4.1v2.06c2.89-.86 5-3.54 5-6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.52.52-.89 1.15-1.14 1.83h2.06c.13-.27.33-.52.58-.77l.01-.01L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>';
+        // 静音状态的图标由Plyr播放器处理
       } else if (v > 0.5) {
-        vIcon.innerHTML = '<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>';
+        // 高音量状态的图标由Plyr播放器处理
       } else {
-        vIcon.innerHTML = '<path d="M18.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM5 9v6h4l5 5V4L9 9H5z"/>';
+        // 低音量状态的图标由Plyr播放器处理
       }
-      volSlider.value = m ? 0 : v;
+
     }
 
     async function playNext(keyword = "") {
@@ -868,12 +771,17 @@ function startVideo(m3u8, name, auto = true) {
           'volume',
           'pip',
           'airplay',
+          'settings',
           'fullscreen'
         ],
         settings: ['quality', 'speed'],
         speed: {
           selected: 1,
           options: [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
+        },
+        quality: {
+          default: 576,
+          options: [144, 240, 360, 480, 720, 1080]
         },
         i18n: {
           restart: '重新开始',
@@ -917,7 +825,7 @@ function startVideo(m3u8, name, auto = true) {
         
         window.player = new Plyr(video, playerSettings);
         
-        video.volume = volSlider.value;
+        video.volume = 0.5;
         video.muted = true; // 确保每次加载视频时都是静音状态
         updateVolUI();
 
@@ -1150,7 +1058,6 @@ function startVideo(m3u8, name, auto = true) {
     };
 
     video.onplaying = () => {
-      $('pIcon').innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
       $('videoPIcon').innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
       $('centerPlayIcon').classList.add('hidden');
       // 视频播放时申请屏幕唤醒锁
@@ -1171,7 +1078,6 @@ function startVideo(m3u8, name, auto = true) {
             $('videoBufferBar').style.width = "0%";
           }
           const timeText = `${fmt(video.currentTime)} / ${fmt(video.duration)}`;
-          $('timeBox').innerText = timeText;
           $('videoTimeDisplay').innerText = timeText;
           requestAnimationFrame(up);
         }
@@ -1181,7 +1087,6 @@ function startVideo(m3u8, name, auto = true) {
 
     video.onpause = () => {
       if (isLoaded) $('centerPlayIcon').classList.remove('hidden');
-      $('pIcon').innerHTML = '<path d="M8 5v14l11-7z"/>';
       $('videoPIcon').innerHTML = '<path d="M8 5v14l11-7z"/>';
       // 视频暂停时释放屏幕唤醒锁
       releaseWakeLock();
@@ -1204,9 +1109,7 @@ function startVideo(m3u8, name, auto = true) {
     };
 
     $('screen').onclick = () => isLoaded ? (video.paused ? video.play() : video.pause()) : playNext();
-    $('playBtn').onclick = () => isLoaded ? (video.paused ? video.play() : video.pause()) : playNext();
     $('videoPlayBtn').onclick = () => isLoaded ? (video.paused ? video.play() : video.pause()) : playNext();
-    $('nextBtn').onclick = () => playNext();
     $('speedBtn').onclick = (e) => { e.stopPropagation(); $('speedMenu').classList.toggle('show'); };
     $('pipBtn').onclick = async () => {
       try {
@@ -1250,8 +1153,7 @@ function startVideo(m3u8, name, auto = true) {
       }
     });
 
-    volSlider.oninput = (e) => { video.volume = e.target.value; video.muted = (video.volume === 0); updateVolUI(); };
-    volBtn.onclick = () => { video.muted = !video.muted; updateVolUI(); };
+
 
     document.querySelectorAll('.speed-item').forEach(i => {
       i.onclick = (e) => {
@@ -1269,10 +1171,7 @@ function startVideo(m3u8, name, auto = true) {
       if (k === ' ' || k.toLowerCase() === 'k') isLoaded ? (video.paused ? video.play() : video.pause()) : playNext();
       if (k === 'ArrowLeft') seek(-10);
       if (k === 'ArrowRight') seek(10);
-      if (k === 'ArrowUp') { video.volume = Math.min(1, video.volume + 0.1); video.muted = false; updateVolUI(); }
-      if (k === 'ArrowDown') { video.volume = Math.max(0, video.volume - 0.1); updateVolUI(); }
       if (k.toLowerCase() === 'f') $('fullBtn').click();
-      if (k.toLowerCase() === 'm') volBtn.click();
     });
 
     searchInput.onkeydown = (e) => { 
