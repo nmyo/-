@@ -450,6 +450,37 @@
         opacity: 1;
       }
     }
+    
+    /* 全屏模式样式 */
+    .player-stabilizer.fullscreen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      max-width: 100%;
+      max-height: 100%;
+      z-index: 10000;
+      background: #000;
+    }
+    
+    .video-wrapper.fullscreen {
+      width: 100%;
+      height: 100%;
+      max-height: 100%;
+      border-radius: 0;
+      aspect-ratio: inherit;
+    }
+    
+    video:-webkit-full-screen {
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: contain;
+    }
+    
+    video::backdrop {
+      background: #000;
+    }
   </style>
 </head>
 
@@ -1250,12 +1281,6 @@ function startVideo(m3u8, name, auto = true) {
         node.webkitRequestFullscreen();
       }
     };
-
-    // 检测是否为 iOS 设备
-    function isIOSDevice() {
-      return /iPad|iPhone|iPod/.test(navigator.userAgent) || 
-             (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); // 支持 iPadOS
-    }
     
     // 全屏状态变化事件监听
     document.addEventListener('fullscreenchange', () => {
@@ -1269,6 +1294,25 @@ function startVideo(m3u8, name, auto = true) {
         playerNode.classList.remove('fullscreen');
       }
     });
+    
+    // WebKit 全屏变化事件监听（兼容 Safari 和 Chrome 早期版本）
+    document.addEventListener('webkitfullscreenchange', () => {
+      const playerNode = $('playerNode');
+      
+      if (document.webkitFullscreenElement || document.webkitCurrentFullScreenElement) {
+        // 进入全屏
+        playerNode.classList.add('fullscreen');
+      } else {
+        // 退出全屏
+        playerNode.classList.remove('fullscreen');
+      }
+    });
+
+    // 检测是否为 iOS 设备
+    function isIOSDevice() {
+      return /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+             (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); // 支持 iPadOS
+    }
 
 
 
@@ -1304,6 +1348,16 @@ function startVideo(m3u8, name, auto = true) {
       }
       if (k === 'ArrowLeft') seek(-10);
       if (k === 'ArrowRight') seek(10);
+      if (k === 'ArrowUp') {
+        // 增加音量
+        video.volume = Math.min(1, video.volume + 0.1);
+        updateVolUI();
+      }
+      if (k === 'ArrowDown') {
+        // 降低音量
+        video.volume = Math.max(0, video.volume - 0.1);
+        updateVolUI();
+      }
       if (k.toLowerCase() === 'f') $('fullBtn').click();
     });
 
