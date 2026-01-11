@@ -417,15 +417,27 @@
       opacity: 1;
     }
     
-    /* 针对触摸设备的优化 */
+    /* 针对触摸设备的优化 - 让按钮在触摸设备上更明显 */
     @media (hover: none) and (pointer: coarse) {
       .next-video-btn {
-        opacity: 0;
+        opacity: 0.6; /* 在触摸设备上保持一定透明度但仍可见 */
       }
       
+      .next-video-btn:hover,
       .next-video-btn.force-visible {
         opacity: 1;
       }
+    }
+    
+    /* 鼠标悬停效果增强 */
+    .next-video-btn:hover {
+      opacity: 1;
+      transform: scale(1.1);
+    }
+    
+    /* 添加按钮点击效果 */
+    .next-video-btn:active {
+      transform: scale(0.95);
     }
     
 
