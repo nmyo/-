@@ -484,10 +484,10 @@
 
   <script>
     const $ = id => document.getElementById(id);
-    const video = $('video'), bar = $('progressBar'), buf = $('bufferBar'), wrap = $('progressWrap');
+    const video = $('video'); // 移除了不存在的progressBar、bufferBar和progressWrap引用
     const searchInput = $('searchInput'), resultsList = $('resultsList');
 
-    let hls = null, isDragging = false, isLoaded = false;
+    let hls = null, isDragging = false, isLoaded = false, videoWrapRect = null;
     let usedCodes = [];
     const API = "https://apiv.nyanx.de/";
     let wakeLock = null;
@@ -946,11 +946,9 @@ function startVideo(m3u8, name, auto = true) {
     }
     const handleProgress = (e, isFinal = false, targetWrap = null) => {
       const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-      const rect = targetWrap || wrapRect;
+      const rect = targetWrap || videoWrapRect; // 使用videoWrapRect代替不存在的wrapRect
       const p = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
       
-      // 更新外部进度条
-      bar.style.width = (p * 100) + "%";
       // 更新内部进度条
       if (typeof $('videoProgressBar') !== 'undefined' && $('videoProgressBar')) {
         $('videoProgressBar').style.width = (p * 100) + "%";
@@ -959,12 +957,6 @@ function startVideo(m3u8, name, auto = true) {
       if (isFinal) video.currentTime = p * video.duration;
     };
 
-    wrap.onmousedown = (e) => {
-      isDragging = true;
-      wrapRect = wrap.getBoundingClientRect();
-      handleProgress(e);
-    };
-    
     // 内部进度条的鼠标事件处理
     const videoProgressWrap = $('videoProgressWrap');
     if (videoProgressWrap) {
@@ -986,12 +978,6 @@ function startVideo(m3u8, name, auto = true) {
       }
     };
     
-    wrap.ontouchstart = (e) => {
-      isDragging = true;
-      wrapRect = wrap.getBoundingClientRect();
-      handleProgress(e);
-    };
-    
     // 内部进度条的触摸事件处理
     if (videoProgressWrap) {
       videoProgressWrap.ontouchstart = (e) => {
@@ -1000,13 +986,6 @@ function startVideo(m3u8, name, auto = true) {
         handleProgress(e, false, videoWrapRect);
       };
     }
-    
-    wrap.ontouchmove = (e) => {
-      if (isDragging) {
-        e.preventDefault();
-        handleProgress(e);
-      }
-    };
     
     // 内部进度条的触摸移动事件处理
     if (videoProgressWrap) {
@@ -1017,13 +996,6 @@ function startVideo(m3u8, name, auto = true) {
         }
       };
     }
-    
-    wrap.ontouchend = (e) => {
-      if (isDragging) {
-        isDragging = false;
-        handleProgress(e, true);
-      }
-    };
     
     // 内部进度条的触摸结束事件处理
     if (videoProgressWrap) {
@@ -1065,15 +1037,11 @@ function startVideo(m3u8, name, auto = true) {
       const up = () => {
         if (!video.paused && !isDragging) {
           if (video.duration && video.duration > 0) {
-            bar.style.width = (video.currentTime / video.duration * 100) + "%";
-            if (video.buffered.length) buf.style.width = (video.buffered.end(video.buffered.length - 1) / video.duration * 100) + "%";
-            
             // 更新内部进度条
             $('videoProgressBar').style.width = (video.currentTime / video.duration * 100) + "%";
             if (video.buffered.length) $('videoBufferBar').style.width = (video.buffered.end(video.buffered.length - 1) / video.duration * 100) + "%";
           } else {
-            bar.style.width = "0%";
-            buf.style.width = "0%";
+            // 更新内部进度条
             $('videoProgressBar').style.width = "0%";
             $('videoBufferBar').style.width = "0%";
           }
@@ -1108,7 +1076,16 @@ function startVideo(m3u8, name, auto = true) {
       playNext(); 
     };
 
-    $('screen').onclick = () => isLoaded ? (video.paused ? video.play() : video.pause()) : playNext();
+    // 点击视频区域播放/暂停
+    $('screen').onclick = (e) => {
+      // 如果点击的是内部播放按钮，不执行此操作（防止重复）
+      if (e.target.closest('#videoPlayBtn')) {
+        return;
+      }
+      isLoaded ? (video.paused ? video.play() : video.pause()) : playNext();
+    };
+    
+    // 内部播放按钮点击事件
     $('videoPlayBtn').onclick = () => isLoaded ? (video.paused ? video.play() : video.pause()) : playNext();
     $('speedBtn').onclick = (e) => { e.stopPropagation(); $('speedMenu').classList.toggle('show'); };
     $('pipBtn').onclick = async () => {
