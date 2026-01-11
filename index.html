@@ -537,6 +537,10 @@
       display: block;
     }
     
+    .volume-control:hover {
+      display: block !important;
+    }
+    
     /* 确保音量按钮容器相对定位以容纳音量控制条 */
     #videoVolBtn {
       position: relative;
@@ -576,7 +580,8 @@
     }
     
     .volume-slider::-webkit-slider-thumb:hover {
-      transform: scale(1.2);
+      transform: scale(1.3);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
     }
     
     .volume-slider:hover::-webkit-slider-thumb,
@@ -1411,6 +1416,13 @@ function startVideo(m3u8, name, auto = true) {
       updateVolUI();
     }
     
+    // 同步音量滑块和音量级别的显示
+    function syncVolumeDisplay() {
+      const volume = video.muted ? 0 : video.volume;
+      volumeSlider.value = volume;
+      volumeLevel.style.height = (volume * 100) + '%';
+    }
+    
     // 设置音量
     function setVolume(volume) {
       video.volume = volume;
@@ -1419,8 +1431,7 @@ function startVideo(m3u8, name, auto = true) {
     }
     
     // 初始化音量
-    volumeSlider.value = video.volume;
-    volumeLevel.style.height = (video.volume * 100) + '%';
+    syncVolumeDisplay();
     
     // 音量滑块事件
     volumeSlider.oninput = function() {
@@ -1456,6 +1467,23 @@ function startVideo(m3u8, name, auto = true) {
         video.muted = !video.muted;
         updateVolUI();
       };
+      
+      // 为音量按钮添加mouseenter和mouseleave事件来更好地控制显示/隐藏
+      $('videoVolBtn').addEventListener('mouseenter', () => {
+        volumeControl.style.display = 'block';
+      });
+      
+      $('videoVolBtn').addEventListener('mouseleave', (e) => {
+        // 检查鼠标是否移动到了音量控制条上，如果是则不隐藏
+        if (!e.relatedTarget || !e.relatedTarget.closest('.volume-control')) {
+          volumeControl.style.display = 'none';
+        }
+      });
+      
+      // 为音量控制条添加mouseleave事件来隐藏它
+      volumeControl.addEventListener('mouseleave', () => {
+        volumeControl.style.display = 'none';
+      });
     }
     
     // 下一个视频按钮点击事件
