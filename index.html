@@ -508,12 +508,33 @@
           </div>
           
           <div class="video-bottom-controls">
-            <div class="video-time-display" id="videoTimeDisplay">0:00 / 0:00</div>
-            <button class="video-play-btn" id="videoPlayBtn">
-              <svg id="videoPIcon" viewBox="0 0 24 24">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-            </button>
+            <div class="btn-group" style="display: flex; align-items: center; gap: 8px;">
+              <button class="video-play-btn" id="videoPlayBtn">
+                <svg id="videoPIcon" viewBox="0 0 24 24">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              </button>
+            </div>
+            <div class="btn-group" style="display: flex; align-items: center; gap: 10px; position: relative;">
+              <div class="speed-menu" id="speedMenu">
+                <div class="speed-item" data-val="0.5">0.5x</div>
+                <div class="speed-item active" data-val="1.0">1.0x</div>
+                <div class="speed-item" data-val="1.5">1.5x</div>
+                <div class="speed-item" data-val="2.0">2.0x</div>
+              </div>
+              <button class="btn" id="speedBtn">1.0x</button>
+              <button class="btn" id="pipBtn">
+                <svg viewBox="0 0 24 24">
+                  <path
+                    d="M19 11h-8v6h8v-6zm4 8V4.98C23 3.88 22.1 3 21 3H3c-1.1 0-2 .88-2 1.98V19c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2zm-2 .02H3V4.97h18v14.05z" />
+                </svg>
+              </button>
+              <button class="btn" id="fullBtn">
+                <svg viewBox="0 0 24 24">
+                  <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3z" />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -545,33 +566,11 @@
           <button class="seek-btn" onclick="window.seek(600)">+10m</button>
         </div>
         
-        <!-- 音量控制 -->
+        <!-- 音量控制和时间显示 -->
         <div class="btn-group" style="display: flex; align-items: center; gap: 8px;">
           <button class="btn" id="volBtn"><svg id="vIcon" viewBox="0 0 24 24"></svg></button>
           <input type="range" id="volSlider" min="0" max="1" step="0.01" value="0.5" style="width: 80px;">
-          <span id="timeBox" style="min-width: 100px; text-align: center; color: #999; font-size: 14px; margin-left: 10px;">0:00 / 0:00</span>
-        </div>
-        
-        <!-- 速度和其他控制 -->
-        <div class="btn-group" style="display: flex; align-items: center; gap: 10px; position: relative;">
-          <div class="speed-menu" id="speedMenu">
-            <div class="speed-item" data-val="0.5">0.5x</div>
-            <div class="speed-item active" data-val="1.0">1.0x</div>
-            <div class="speed-item" data-val="1.5">1.5x</div>
-            <div class="speed-item" data-val="2.0">2.0x</div>
-          </div>
-          <button class="btn" id="speedBtn">1.0x</button>
-          <button class="btn" id="pipBtn">
-            <svg viewBox="0 0 24 24">
-              <path
-                d="M19 11h-8v6h8v-6zm4 8V4.98C23 3.88 22.1 3 21 3H3c-1.1 0-2 .88-2 1.98V19c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2zm-2 .02H3V4.97h18v14.05z" />
-            </svg>
-          </button>
-          <button class="btn" id="fullBtn">
-            <svg viewBox="0 0 24 24">
-              <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3z" />
-            </svg>
-          </button>
+          <span id="timeBox" style="min-width: 100px; text-align: center; color: #999; font-size: 14px;">0:00 / 0:00</span>
         </div>
       </div>
     </div>
