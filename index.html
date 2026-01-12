@@ -854,7 +854,27 @@
 
       // 获取当前网络状况并配置HLS参数
       const networkQuality = getNetworkQuality();
-      const hlsConfig = getHlsConfigForNetwork(networkQuality);
+      // 获取基础配置
+      const baseHlsConfig = getHlsConfigForNetwork(networkQuality);
+      
+      // 增强缓冲区和错误处理配置
+      const hlsConfig = {
+        ...baseHlsConfig,
+        // 专门针对缓冲停滞错误的配置
+        maxBufferHole: 0.01,           // 最小缓冲间隙
+        maxSeekHole: 2,               // 寻找时的最大间隙
+        highBufferWatchdogPeriod: 2,  // 高缓冲监控周期
+        gapControllerOptions: {
+          maxBackBufferLength: 90,    // 最大后缓冲长度
+          gapThreshold: 0.1           // 间隙阈值
+        },
+        // 错误恢复配置
+        nudgeOffset: 0.05,            // 微调偏移量
+        nudgeMaxRetry: 10,            // 微调最大重试次数
+        maxFragLookUpTolerance: 0.02, // 片段查找容差
+        abrBandWidthFactor: 0.7,      // 带宽使用因子
+        abrBandWidthUpFactor: 0.8,    // 带宽上调因子
+      };
 
       const setup = () => {
         video.volume = volSlider.value;
@@ -989,6 +1009,20 @@
         hls.on(Hls.Events.ERROR, function (event, data) {
           console.error('HLS Error:', data);
           
+          // 检查是否正在恢复中，避免重复处理
+          if (data.details === 'bufferStalledError') {
+            console.log('Buffer stalled, attempting recovery...');
+            // 对于缓冲停滞错误，尝试降低质量等级
+            if (hls && hls.nextLoadLevel > 0) {
+              hls.nextLoadLevel = Math.max(0, hls.nextLoadLevel - 1);
+            }
+            // 增加缓冲区大小以应对停滞
+            if (hls) {
+              hls.config.maxBufferLength = Math.min(hls.config.maxBufferLength + 30, 180);
+            }
+            return;
+          }
+          
           switch (data.type) {
             case Hls.ErrorTypes.NETWORK_ERROR:
               console.log('Network error, trying to recover...');
@@ -1045,21 +1079,68 @@
               buffering: data.stats.buffering.end - data.stats.buffering.start
             });
           }
+          
+          // 检查缓冲区状态，防止缓冲停滞
+          if (video && video.buffered) {
+            try {
+              const buffered = video.buffered;
+              if (buffered.length > 0) {
+                const bufferedEnd = buffered.end(buffered.length - 1);
+                const currentTime = video.currentTime;
+                
+                // 如果缓冲区与当前播放位置差距过大，调整缓冲策略
+                if (bufferedEnd - currentTime < 10) { // 如果缓冲不足10秒
+                  if (hls) {
+                    // 临时增加缓冲区长度
+                    hls.config.maxBufferLength = Math.min(hls.config.maxBufferLength + 10, 180);
+                  }
+                }
+              }
+            } catch (e) {
+              console.warn('Error checking buffer status:', e);
+            }
+          }
         });
         
-        // 监控缓冲区状态
+        // 监听缓冲区更新事件，持续确保有足够的预加载内容
+        hls.on(Hls.Events.BUFFER_APPENDED, function (event, data) {
+          // 检查缓冲区状态
+          if (video && video.buffered) {
+            try {
+              const buffered = video.buffered;
+              if (buffered.length > 0) {
+                const bufferedEnd = buffered.end(buffered.length - 1);
+                const duration = video.duration || Infinity;
+                const targetBufferEnd = Math.min(duration, video.currentTime + 30); // 目标缓冲30秒
+                
+                // 如果缓冲区未达到目标时间，则调整配置
+                if (bufferedEnd < targetBufferEnd) {
+                  if (hls && hls.config.maxBufferLength < 60) {
+                    hls.config.maxBufferLength = Math.min(60, duration); // 增加缓冲区大小
+                  }
+                }
+              }
+            } catch (e) {
+              console.warn('Error in BUFFER_APPENDED handler:', e);
+            }
+          }
+        });
+        
+        // 监听缓冲区创建事件
         hls.on(Hls.Events.BUFFER_CREATED, function (event, data) {
           console.debug('Buffer created');
         });
         
-        hls.on(Hls.Events.BUFFER_APPENDING, function (event, data) {
-          // 监控缓冲区追加
+        // 监听缓冲区清空事件
+        hls.on(Hls.Events.BUFFER_FLUSHED, function (event, data) {
+          console.debug('Buffer flushed');
+          // 缓冲区被清空时，可能需要调整策略
+          if (hls) {
+            hls.config.maxBufferLength = Math.max(hls.config.maxBufferLength, 30);
+          }
         });
         
-        hls.on(Hls.Events.BUFFER_FLUSHED, function (event, data) {
-          // 监控缓冲区清空
-          console.debug('Buffer flushed');
-        });
+        
         
         // 监控级别变化
         hls.on(Hls.Events.LEVEL_SWITCHED, function (event, data) {
@@ -1068,7 +1149,71 @@
         
         hls.loadSource(finalUrl);
         hls.attachMedia(video);
-        hls.on(Hls.Events.MANIFEST_PARSED, setup);
+        
+        // 定期检查缓冲区健康状态的函数
+        let bufferHealthCheckInterval = null;
+        
+        const checkBufferHealth = () => {
+          if (!video || !hls) return;
+          
+          try {
+            const buffered = video.buffered;
+            const currentTime = video.currentTime;
+            const duration = video.duration || Infinity;
+            
+            if (buffered.length > 0) {
+              const bufferedEnd = buffered.end(buffered.length - 1);
+              const timeUntilEnd = duration - currentTime;
+              
+              // 检查当前播放位置是否有足够的缓冲
+              const bufferAhead = bufferedEnd - currentTime;
+              
+              // 如果缓冲不足且不是在播放末尾
+              if (bufferAhead < 10 && timeUntilEnd > 10) {
+                // 动态调整缓冲区长度
+                if (hls.config) {
+                  hls.config.maxBufferLength = Math.min(hls.config.maxBufferLength + 15, 180);
+                }
+              }
+              
+              // 如果缓冲过多，适当减少以节省内存
+              if (bufferAhead > 90) {
+                if (hls.config) {
+                  hls.config.maxBufferLength = Math.max(hls.config.maxBufferLength - 15, 30);
+                }
+              }
+            }
+            
+            // 检查播放状态是否正常
+            if (!video.paused && video.readyState < 2) { // HAVE_CURRENT_DATA
+              // 如果正在播放但没有足够数据，可能需要采取措施
+              console.debug('Video playback may be stalled, readyState:', video.readyState);
+            }
+            
+          } catch (e) {
+            console.warn('Error in buffer health check:', e);
+          }
+        };
+        
+        // 在MANIFEST_PARSED后启动健康检查
+        hls.on(Hls.Events.MANIFEST_PARSED, function() {
+          // 启动缓冲区健康检查定时器
+          if (bufferHealthCheckInterval) {
+            clearInterval(bufferHealthCheckInterval);
+          }
+          bufferHealthCheckInterval = setInterval(checkBufferHealth, 5000); // 每5秒检查一次
+          
+          // 执行setup函数
+          setup();
+        });
+        
+        // 监听播放器销毁事件，清理定时器
+        hls.on(Hls.Events.DESTROYING, function() {
+          if (bufferHealthCheckInterval) {
+            clearInterval(bufferHealthCheckInterval);
+            bufferHealthCheckInterval = null;
+          }
+        });
       } else {
         video.src = finalUrl;
         video.onloadedmetadata = setup;
@@ -1200,6 +1345,12 @@
         const history = JSON.parse(localStorage.getItem('video_history') || '{}');
         delete history[data.videoId]; // 播放结束后清除历史记录
         localStorage.setItem('video_history', JSON.stringify(history));
+      }
+      
+      // 清理缓冲区健康检查定时器
+      if (bufferHealthCheckInterval) {
+        clearInterval(bufferHealthCheckInterval);
+        bufferHealthCheckInterval = null;
       }
 
       playNext();
@@ -1378,6 +1529,34 @@
         console.log(`页面将在 ${(AUTO_REFRESH_TIME - inactiveTime) / 60000 | 0} 分钟后刷新`);
       }
     }, 60000); // 每分钟检查一次
+    
+    // 页面卸载前清理资源
+    window.addEventListener('beforeunload', function() {
+      // 清理缓冲区健康检查定时器
+      if (bufferHealthCheckInterval) {
+        clearInterval(bufferHealthCheckInterval);
+        bufferHealthCheckInterval = null;
+      }
+      
+      // 销毁HLS实例
+      if (hls) {
+        hls.stopLoad();
+        hls.detachMedia();
+        hls.destroy();
+        hls = null;
+      }
+    });
+    
+    // 页面隐藏时清理资源
+    document.addEventListener('visibilitychange', function() {
+      if (document.hidden) {
+        // 页面隐藏时也可以考虑清理一些资源
+        if (hls && hls.config) {
+          // 可以考虑减小缓冲区以节省内存
+          hls.config.maxBufferLength = Math.min(hls.config.maxBufferLength, 30);
+        }
+      }
+    });
 
     window.onload = () => {
       // 为iOS设备添加特定CSS类
