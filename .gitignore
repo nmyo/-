@@ -1,1 +1,1 @@
-Nothing needs to be added to .gitignore since the changes only include source/config files (HTML and markdown files) without any build artifacts, dependencies, or temporary files.
+Nothing needs to be added to .gitignore since only a single HTML file (`index_optimized.html`) was modified and no build artifacts, dependencies, or temporary files were included in the changes.
