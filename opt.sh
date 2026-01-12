@@ -57,12 +57,11 @@ update_system() {
     fi
 }
 
-# 3. 基础依赖与 haveged (熵池优化)
+# 3. 基础依赖安装
 install_base_tools() {
     echo -e "${GREEN}正在安装基础依赖工具...${NC}"
     local packages="curl vnstat sudo vim nload lsof dnsutils btop jq virt-what haveged"
     
-    # RHEL 系需要先安装 epel-release
     if [[ "$PACKAGE_MANAGER" != "apt" ]]; then
         pkg_install epel-release
     fi
@@ -71,74 +70,83 @@ install_base_tools() {
     systemctl enable --now haveged
 }
 
-# 4. Swap 自动配置 (仅针对 KVM/物理机)
+# 4. Swap 自动配置
 configure_swap() {
     local virtualization_type=$(virt-what 2>/dev/null)
-    # 如果是 OpenVZ 或 LXC，通常无法在容器内挂载 Swap
     if [[ "$virtualization_type" == *"lxc"* || "$virtualization_type" == *"openvz"* ]]; then
         echo -e "${YELLOW}检测到容器虚拟化 ($virtualization_type)，跳过 Swap 配置。${NC}"
         return
     fi
 
-    local mem=$(free -m | awk '/^Mem:/{print $2}')
     local swap=$(free -m | awk '/^Swap:/{print $2}')
-
     if [ "$swap" -eq 0 ]; then
         echo -e "${GREEN}检测到未配置 Swap，正在创建 1GB 虚拟内存...${NC}"
-        # 使用 fallocate 更快，如果不支持则回退到 dd
         fallocate -l 1G /swapfile || dd if=/dev/zero of=/swapfile bs=1M count=1024
         chmod 600 /swapfile
         mkswap /swapfile && swapon /swapfile
         echo '/swapfile none swap sw 0 0' >> /etc/fstab
-        echo -e "${GREEN}Swap 配置完成。${NC}"
     else
         echo -e "${GREEN}系统已存在 Swap ($swap MB)，跳过。${NC}"
     fi
 }
 
-# 5. 内核参数深度优化 (BBR/网络/内存)
+# 5. 内核参数深度优化 (按要求覆盖 /etc/sysctl.conf)
 optimize_kernel() {
-    echo -e "${GREEN}正在配置内核参数 (sysctl)...${NC}"
+    echo -e "${GREEN}正在配置内核参数 (/etc/sysctl.conf)...${NC}"
     
-    # 智能选择队列算法: 优先使用 cake, 否则使用 fq
-    local qdisc="fq"
-    if sysctl net.core.default_qdisc | grep -q "cake"; then qdisc="cake"; fi
+    # 备份原配置
+    [ -f /etc/sysctl.conf ] && cp /etc/sysctl.conf /etc/sysctl.conf.bak
 
-    # 写入独立的配置文件，不污染主文件
-    cat > /etc/sysctl.d/99-custom-optimize.conf << EOF
-# TCP 拥塞控制 BBR
-net.core.default_qdisc=$qdisc
-net.ipv4.tcp_congestion_control=bbr
+    cat > /etc/sysctl.conf << 'EOF'
+# 文件句柄限制
+fs.file-max                     = 6815744
 
-# 提高并发连接限制
-net.ipv4.tcp_max_syn_backlog=8192
-net.ipv4.tcp_max_tw_buckets=5000
-net.ipv4.tcp_tw_reuse=1
-net.ipv4.tcp_fin_timeout=15
-net.ipv4.tcp_keepalive_time=600
+# 网络队列与连接优化
+net.ipv4.tcp_max_syn_backlog    = 8192
+net.core.somaxconn              = 8192
+net.ipv4.tcp_tw_reuse            = 1
+net.ipv4.tcp_abort_on_overflow  = 1
 
-# 扩大 TCP 接收/发送缓冲区 (适合高速网络)
-net.core.rmem_max=67108864
-net.core.wmem_max=67108864
-net.ipv4.tcp_rmem=4096 87380 67108864
-net.ipv4.tcp_wmem=4096 65536 67108864
+# BBR 拥塞控制与队列算法
+net.core.default_qdisc          = fq
+net.ipv4.tcp_congestion_control = bbr
 
-# 启用转发
-net.ipv4.ip_forward=1
-net.ipv4.conf.all.route_localnet=1
+# TCP 特性优化
+net.ipv4.tcp_no_metrics_save    = 1
+net.ipv4.tcp_ecn                = 0
+net.ipv4.tcp_frto               = 0
+net.ipv4.tcp_mtu_probing         = 0
+net.ipv4.tcp_rfc1337            = 1
+net.ipv4.tcp_sack               = 1
+net.ipv4.tcp_fack               = 1
+net.ipv4.tcp_window_scaling     = 1
+net.ipv4.tcp_adv_win_scale      = 2
+net.ipv4.tcp_moderate_rcvbuf    = 1
+net.ipv4.tcp_fin_timeout        = 30
 
-# 内存优化
-vm.swappiness=10
-vm.vfs_cache_pressure=50
-vm.overcommit_memory=1
+# 缓冲区调整 (适合高速大带宽)
+net.ipv4.tcp_rmem               = 4096 87380 67108864
+net.ipv4.tcp_wmem               = 4096 65536 67108864
+net.core.rmem_max               = 67108864
+net.core.wmem_max               = 67108864
+net.ipv4.udp_rmem_min           = 8192
+net.ipv4.udp_wmem_min           = 8192
 
-# 其他网络增强
-net.ipv4.tcp_fastopen=3
-net.ipv4.tcp_slow_start_after_idle=0
-net.ipv4.tcp_mtu_probing=1
+# 端口范围与时间戳
+net.ipv4.ip_local_port_range    = 1024 65535
+net.ipv4.tcp_timestamps         = 1
+
+# 路由与转发
+net.ipv4.conf.all.rp_filter     = 0
+net.ipv4.conf.default.rp_filter = 0
+net.ipv4.ip_forward             = 1
+net.ipv6.conf.all.forwarding    = 1
+net.ipv6.conf.default.forwarding= 1
+net.ipv4.conf.all.route_localnet= 1
 EOF
-    sysctl -p /etc/sysctl.d/99-custom-optimize.conf &>/dev/null
-    sysctl --system &>/dev/null
+
+    sysctl -p
+    sysctl --system
 }
 
 # 6. 文件打开数优化
@@ -154,12 +162,14 @@ root            hard    nofile          65535
 EOF
 }
 
-# 7. 日志管理优化 (防止日志占满硬盘)
+# 7. 日志管理优化
 configure_journald() {
     echo -e "${GREEN}正在优化 Journald 日志大小限制...${NC}"
-    sed -i 's/^#\?SystemMaxUse.*/SystemMaxUse=50M/' /etc/systemd/journald.conf
-    sed -i 's/^#\?RuntimeMaxUse.*/RuntimeMaxUse=10M/' /etc/systemd/journald.conf
-    systemctl restart systemd-journald
+    if [ -f /etc/systemd/journald.conf ]; then
+        sed -i 's/^#\?SystemMaxUse.*/SystemMaxUse=50M/' /etc/systemd/journald.conf
+        sed -i 's/^#\?RuntimeMaxUse.*/RuntimeMaxUse=10M/' /etc/systemd/journald.conf
+        systemctl restart systemd-journald
+    fi
 }
 
 # 8. IPv4 优先配置
@@ -171,12 +181,15 @@ configure_ipv4_priority() {
     fi
 }
 
-# 主程序逻辑
+# 主程序
 main() {
+    clear
     check_root
     check_package_manager
     
-    echo -e "${YELLOW}>>> 开始系统初始化优化 <<<${NC}"
+    echo -e "${YELLOW}========================================${NC}"
+    echo -e "${YELLOW}       Linux 系统初始化优化脚本         ${NC}"
+    echo -e "${YELLOW}========================================${NC}"
     
     update_system
     install_base_tools
@@ -186,9 +199,10 @@ main() {
     configure_journald
     configure_ipv4_priority
     
-    echo -e "${GREEN}====================================${NC}"
-    echo -e "${GREEN}  所有优化已完成！建议重启系统。  ${NC}"
-    echo -e "${GREEN}====================================${NC}"
+    echo -e "${GREEN}========================================${NC}"
+    echo -e "${GREEN}  优化完成！请检查上述日志是否存在错误。${NC}"
+    echo -e "${GREEN}  建议执行 'reboot' 重启系统以完全应用。${NC}"
+    echo -e "${GREEN}========================================${NC}"
 }
 
 main
