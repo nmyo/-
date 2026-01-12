@@ -710,9 +710,9 @@
         let url = "";
         const isSearch = keyword && keyword.trim() !== "";
         if (isSearch) {
-          url = `miss-search.php?title=${encodeURIComponent(keyword.trim())}`;
+          url = `miss-random-search.php?title=${encodeURIComponent(keyword.trim())}`;
         } else {
-          url = `${API}?exclude=${usedCodes.join(',')}`;
+          url = `miss-random-search.php?exclude=${usedCodes.join(',')}`;
         }
         
         // 添加超时控制
