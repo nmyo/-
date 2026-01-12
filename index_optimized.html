@@ -1088,232 +1088,279 @@
         } else {
           playNext();
         }
-      }
-
-      // 事件监听器
-      domCache.wrap.addEventListener('mousedown', (e) => {
-        isDragging = true;
-        wrapRect = domCache.wrap.getBoundingClientRect();
-        handleProgress(e);
-      });
-      
-      window.addEventListener('mousemove', (e) => {
-        if (isDragging) handleProgress(e);
-      });
-      
-      window.addEventListener('mouseup', (e) => {
-        if (isDragging) {
-          isDragging = false;
-          handleProgress(e, true);
-        }
-      });
-      
-      domCache.wrap.addEventListener('touchstart', (e) => {
-        isDragging = true;
-        wrapRect = domCache.wrap.getBoundingClientRect();
-        handleProgress(e);
-      });
-      
-      domCache.wrap.addEventListener('touchmove', (e) => {
-        if (isDragging) {
-          e.preventDefault();
-          handleProgress(e);
-        }
-      });
-      
-      domCache.wrap.addEventListener('touchend', (e) => {
-        if (isDragging) {
-          isDragging = false;
-          handleProgress(e, true);
-        }
-      });
-
-      domCache.video.addEventListener('timeupdate', () => {
-        // 保存播放历史
-        const currentVideo = localStorage.getItem('current_video');
-        if (currentVideo && !isDragging) {
-          try {
-            const data = JSON.parse(currentVideo);
-            const history = JSON.parse(localStorage.getItem('video_history') || '{}');
-            // 使用视频ID作为键，而不是原始URL
-            history[data.videoId] = domCache.video.currentTime;
-            
-            // 如果视频播放完毕（接近结尾），则从历史记录中移除
-            if (domCache.video.duration && domCache.video.currentTime > domCache.video.duration - 5) {
-              delete history[data.videoId]; // 播放完毕后清除历史记录
-            }
-            
-            localStorage.setItem('video_history', JSON.stringify(history));
-          } catch(e) {
-          }
-        }
-      });
-
-      domCache.video.addEventListener('playing', () => {
-        domCache.pIcon.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
-        domCache.centerPlayIcon.classList.add('hidden');
-        // 视频播放时申请屏幕唤醒锁
-        requestWakeLock();
-        updateProgress();
-      });
-
-      domCache.video.addEventListener('pause', () => {
-        if (isLoaded) domCache.centerPlayIcon.classList.remove('hidden');
-        domCache.pIcon.innerHTML = '<path d="M8 5v14l11-7z"/>';
-        // 视频暂停时释放屏幕唤醒锁
-        releaseWakeLock();
-        if (animationFrameId) {
-          cancelAnimationFrame(animationFrameId);
-          animationFrameId = null;
-        }
-      });
-
-      domCache.video.addEventListener('ended', () => { 
-        // 视频结束时释放屏幕唤醒锁
-        releaseWakeLock();
-        
-        // 从播放历史中清除当前视频的记录
-        const currentVideo = localStorage.getItem('current_video');
-        if (currentVideo) {
-          const data = JSON.parse(currentVideo);
-          const history = JSON.parse(localStorage.getItem('video_history') || '{}');
-          delete history[data.videoId]; // 播放结束后清除历史记录
-          localStorage.setItem('video_history', JSON.stringify(history));
-        }
-        
-        playNext(); 
-      });
-
-      domCache.screen.addEventListener('click', () => isLoaded ? (domCache.video.paused ? domCache.video.play() : domCache.video.pause()) : playNext());
-      domCache.playBtn.addEventListener('click', () => isLoaded ? (domCache.video.paused ? domCache.video.play() : domCache.video.pause()) : playNext());
-      domCache.nextBtn.addEventListener('click', () => playNext());
-      domCache.speedBtn.addEventListener('click', (e) => { e.stopPropagation(); domCache.speedMenu.classList.toggle('show'); });
-      domCache.pipBtn.addEventListener('click', async () => {
-        try {
-          await domCache.video.requestPictureInPicture();
-        } catch (error) {
-        }
-      });
-
-      // 修复 iOS 全屏
-      domCache.fullBtn.addEventListener('click', () => {
-        const node = domCache.$('playerNode');
-        if (document.fullscreenElement) {
-          document.exitFullscreen();
-        } else if (domCache.video.webkitEnterFullscreen) {
-          // iOS iPhone 专用
-          domCache.video.webkitEnterFullscreen();
-        } else if (node.requestFullscreen) {
-          node.requestFullscreen();
-        } else if (node.webkitRequestFullscreen) {
-          node.webkitRequestFullscreen();
-        }
-      });
-
       // 检测是否为 iOS 设备
       function isIOSDevice() {
         return /iPad|iPhone|iPod/.test(navigator.userAgent) || 
                (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); // 支持 iPadOS
       }
-      
-      // 全屏状态变化事件监听
-      document.addEventListener('fullscreenchange', () => {
-        const playerNode = domCache.$('playerNode');
+
+      // 设置事件监听器
+      function setupEventListeners() {
+        domCache.wrap.addEventListener('mousedown', (e) => {
+          isDragging = true;
+          wrapRect = domCache.wrap.getBoundingClientRect();
+          handleProgress(e);
+        });
         
-        if (document.fullscreenElement) {
-          // 进入全屏
-          playerNode.classList.add('fullscreen');
-        } else {
-          // 退出全屏
-          playerNode.classList.remove('fullscreen');
-        }
-      });
+        window.addEventListener('mousemove', (e) => {
+          if (isDragging) handleProgress(e);
+        });
+        
+        window.addEventListener('mouseup', (e) => {
+          if (isDragging) {
+            isDragging = false;
+            handleProgress(e, true);
+          }
+        });
+        
+        domCache.wrap.addEventListener('touchstart', (e) => {
+          isDragging = true;
+          wrapRect = domCache.wrap.getBoundingClientRect();
+          handleProgress(e);
+        });
+        
+        domCache.wrap.addEventListener('touchmove', (e) => {
+          if (isDragging) {
+            e.preventDefault();
+            handleProgress(e);
+          }
+        });
+        
+        domCache.wrap.addEventListener('touchend', (e) => {
+          if (isDragging) {
+            isDragging = false;
+            handleProgress(e, true);
+          }
+        });
 
-      domCache.volSlider.addEventListener('input', (e) => { 
-        domCache.video.volume = e.target.value; 
-        domCache.video.muted = (domCache.video.volume === 0); 
-        updateVolUI(); 
-      });
-      domCache.volBtn.addEventListener('click', () => { 
-        domCache.video.muted = !domCache.video.muted; 
-        updateVolUI(); 
-      });
+        domCache.video.addEventListener('timeupdate', () => {
+          // 保存播放历史
+          const currentVideo = localStorage.getItem('current_video');
+          if (currentVideo && !isDragging) {
+            try {
+              const data = JSON.parse(currentVideo);
+              const history = JSON.parse(localStorage.getItem('video_history') || '{}');
+              // 使用视频ID作为键，而不是原始URL
+              history[data.videoId] = domCache.video.currentTime;
+              
+              // 如果视频播放完毕（接近结尾），则从历史记录中移除
+              if (domCache.video.duration && domCache.video.currentTime > domCache.video.duration - 5) {
+                delete history[data.videoId]; // 播放完毕后清除历史记录
+              }
+              
+              localStorage.setItem('video_history', JSON.stringify(history));
+            } catch(e) {
+            }
+          }
+        });
 
-      // 速度选择事件监听
-      document.querySelectorAll('.speed-item').forEach(item => {
-        item.addEventListener('click', (e) => {
+        domCache.video.addEventListener('playing', () => {
+          domCache.pIcon.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+          domCache.centerPlayIcon.classList.add('hidden');
+          // 视频播放时申请屏幕唤醒锁
+          requestWakeLock();
+          updateProgress();
+        });
+
+        domCache.video.addEventListener('pause', () => {
+          if (isLoaded) domCache.centerPlayIcon.classList.remove('hidden');
+          domCache.pIcon.innerHTML = '<path d="M8 5v14l11-7z"/>';
+          // 视频暂停时释放屏幕唤醒锁
+          releaseWakeLock();
+          if (animationFrameId) {
+            cancelAnimationFrame(animationFrameId);
+            animationFrameId = null;
+          }
+        });
+
+        domCache.video.addEventListener('ended', () => { 
+          // 视频结束时释放屏幕唤醒锁
+          releaseWakeLock();
+          
+          // 从播放历史中清除当前视频的记录
+          const currentVideo = localStorage.getItem('current_video');
+          if (currentVideo) {
+            const data = JSON.parse(currentVideo);
+            const history = JSON.parse(localStorage.getItem('video_history') || '{}');
+            delete history[data.videoId]; // 播放结束后清除历史记录
+            localStorage.setItem('video_history', JSON.stringify(history));
+          }
+          
+          playNext(); 
+        });
+
+        domCache.screen.addEventListener('click', () => isLoaded ? (domCache.video.paused ? domCache.video.play() : domCache.video.pause()) : playNext());
+        domCache.playBtn.addEventListener('click', () => isLoaded ? (domCache.video.paused ? domCache.video.play() : domCache.video.pause()) : playNext());
+        domCache.nextBtn.addEventListener('click', () => playNext());
+        domCache.speedBtn.addEventListener('click', (e) => { e.stopPropagation(); domCache.speedMenu.classList.toggle('show'); });
+        domCache.pipBtn.addEventListener('click', async () => {
+          try {
+            await domCache.video.requestPictureInPicture();
+          } catch (error) {
+          }
+        });
+
+        // 修复 iOS 全屏
+        domCache.fullBtn.addEventListener('click', () => {
+          const node = domCache.$('playerNode');
+          if (document.fullscreenElement) {
+            document.exitFullscreen();
+          } else if (domCache.video.webkitEnterFullscreen) {
+            // iOS iPhone 专用
+            domCache.video.webkitEnterFullscreen();
+          } else if (node.requestFullscreen) {
+            node.requestFullscreen();
+          } else if (node.webkitRequestFullscreen) {
+            node.webkitRequestFullscreen();
+          }
+        });
+        
+        // 全屏状态变化事件监听
+        document.addEventListener('fullscreenchange', () => {
+          const playerNode = domCache.$('playerNode');
+          
+          if (document.fullscreenElement) {
+            // 进入全屏
+            playerNode.classList.add('fullscreen');
+          } else {
+            // 退出全屏
+            playerNode.classList.remove('fullscreen');
+          }
+        });
+
+        domCache.volSlider.addEventListener('input', (e) => { 
+          domCache.video.volume = e.target.value; 
+          domCache.video.muted = (domCache.video.volume === 0); 
+          updateVolUI(); 
+        });
+        domCache.volBtn.addEventListener('click', () => { 
+          domCache.video.muted = !domCache.video.muted; 
+          updateVolUI(); 
+        });
+
+        // 速度选择事件监听
+        document.querySelectorAll('.speed-item').forEach(item => {
+          item.addEventListener('click', (e) => {
+            e.stopPropagation(); 
+            domCache.video.playbackRate = parseFloat(item.dataset.val);
+            domCache.speedBtn.innerText = item.dataset.val + 'x';
+            document.querySelectorAll('.speed-item').forEach(el => el.classList.remove('active'));
+            item.classList.add('active'); 
+            domCache.speedMenu.classList.remove('show');
+          });
+        });
+
+        // 键盘快捷键
+        document.addEventListener('keydown', (e) => {
+          if (document.activeElement === domCache.searchInput) return;
+          const k = e.key;
+          if ([' ', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(k)) e.preventDefault();
+          if (k === ' ' || k.toLowerCase() === 'k') isLoaded ? (domCache.video.paused ? domCache.video.play() : domCache.video.pause()) : playNext();
+          if (k === 'ArrowLeft') seek(-10);
+          if (k === 'ArrowRight') seek(10);
+          if (k === 'ArrowUp') { domCache.video.volume = Math.min(1, domCache.video.volume + 0.1); domCache.video.muted = false; updateVolUI(); }
+          if (k === 'ArrowDown') { domCache.video.volume = Math.max(0, domCache.video.volume - 0.1); updateVolUI(); }
+          if (k.toLowerCase() === 'f') domCache.fullBtn.click();
+          if (k.toLowerCase() === 'm') domCache.volBtn.click();
+        });
+
+        // 搜索框事件
+        domCache.searchInput.addEventListener('keydown', (e) => { 
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            playNext(domCache.searchInput.value.trim()); 
+          }
           e.stopPropagation(); 
-          domCache.video.playbackRate = parseFloat(item.dataset.val);
-          domCache.speedBtn.innerText = item.dataset.val + 'x';
-          document.querySelectorAll('.speed-item').forEach(el => el.classList.remove('active'));
-          item.classList.add('active'); 
+        });
+        
+        // 跳转函数
+        window.seek = s => domCache.video.currentTime += s;
+
+        // 统一的跳转按钮事件处理
+        document.querySelectorAll('.seek-btn').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            const seekValue = parseInt(btn.dataset.seek);
+            window.seek(seekValue);
+          });
+        });
+
+        // 点击外部关闭菜单
+        window.addEventListener('click', (e) => {
+          if (!e.target.closest('.search-container')) domCache.resultsList.style.display = 'none';
           domCache.speedMenu.classList.remove('show');
         });
-      });
 
-      // 键盘快捷键
-      document.addEventListener('keydown', (e) => {
-        if (document.activeElement === domCache.searchInput) return;
-        const k = e.key;
-        if ([' ', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(k)) e.preventDefault();
-        if (k === ' ' || k.toLowerCase() === 'k') isLoaded ? (domCache.video.paused ? domCache.video.play() : domCache.video.pause()) : playNext();
-        if (k === 'ArrowLeft') seek(-10);
-        if (k === 'ArrowRight') seek(10);
-        if (k === 'ArrowUp') { domCache.video.volume = Math.min(1, domCache.video.volume + 0.1); domCache.video.muted = false; updateVolUI(); }
-        if (k === 'ArrowDown') { domCache.video.volume = Math.max(0, domCache.video.volume - 0.1); updateVolUI(); }
-        if (k.toLowerCase() === 'f') domCache.fullBtn.click();
-        if (k.toLowerCase() === 'm') domCache.volBtn.click();
-      });
+        // 自动刷新功能 - 长时间无操作后刷新
+        let inactivityTimer;
+        const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30分钟无操作后刷新
 
-      // 搜索框事件
-      domCache.searchInput.addEventListener('keydown', (e) => { 
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          playNext(domCache.searchInput.value.trim()); 
+        function resetInactivityTimer() {
+          clearTimeout(inactivityTimer);
+          inactivityTimer = setTimeout(() => {
+            // 30分钟无操作后刷新页面
+            location.reload();
+          }, INACTIVITY_TIMEOUT);
         }
-        e.stopPropagation(); 
-      });
-      
-      // 跳转函数
-      window.seek = s => domCache.video.currentTime += s;
 
-      // 统一的跳转按钮事件处理
-      document.querySelectorAll('.seek-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          const seekValue = parseInt(btn.dataset.seek);
-          window.seek(seekValue);
-        });
-      });
+        // 为各种用户活动事件重置计时器
+        function setupInactivityTimer() {
+          const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click', 'wheel'];
+          events.forEach(event => {
+            document.addEventListener(event, resetInactivityTimer, true);
+          });
+          resetInactivityTimer(); // 初始化计时器
+        }
 
-      // 点击外部关闭菜单
-      window.addEventListener('click', (e) => {
-        if (!e.target.closest('.search-container')) domCache.resultsList.style.display = 'none';
-        domCache.speedMenu.classList.remove('show');
-      });
-
-      // 自动刷新功能 - 长时间无操作后刷新
-      let inactivityTimer;
-      const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30分钟无操作后刷新
-
-      function resetInactivityTimer() {
-        clearTimeout(inactivityTimer);
-        inactivityTimer = setTimeout(() => {
-          // 30分钟无操作后刷新页面
-          location.reload();
-        }, INACTIVITY_TIMEOUT);
+        // 启动无操作自动刷新定时器
+        setupInactivityTimer();
       }
 
-      // 为各种用户活动事件重置计时器
-      function setupInactivityTimer() {
-        const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click', 'wheel'];
-        events.forEach(event => {
-          document.addEventListener(event, resetInactivityTimer, true);
+      // DOM准备就绪后初始化
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+          initDomCache();
+          
+          // 设置事件监听器
+          setupEventListeners();
+          
+          // 为iOS设备添加特定CSS类
+          if (isIOSDevice()) {
+            document.body.classList.add('ios-device');
+          }
+          
+          domCache.video.volume = 0.5;
+          domCache.video.muted = true; // 初始状态静音
+          updateVolUI();
+          const saved = localStorage.getItem('current_video');
+          if (saved) {
+            const data = JSON.parse(saved);
+            startVideo(data.m3u8, data.name, false);
+          } else {
+            playNext();
+          }
         });
-        resetInactivityTimer(); // 初始化计时器
+      } else {
+        initDomCache();
+        
+        // 设置事件监听器
+        setupEventListeners();
+        
+        // 为iOS设备添加特定CSS类
+        if (isIOSDevice()) {
+          document.body.classList.add('ios-device');
+        }
+        
+        domCache.video.volume = 0.5;
+        domCache.video.muted = true; // 初始状态静音
+        updateVolUI();
+        const saved = localStorage.getItem('current_video');
+        if (saved) {
+          const data = JSON.parse(saved);
+          startVideo(data.m3u8, data.name, false);
+        } else {
+          playNext();
+        }
       }
-
-      // 启动无操作自动刷新定时器
-      setupInactivityTimer();
     })();
   </script>
 </body>
