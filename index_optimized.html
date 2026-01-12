@@ -1306,7 +1306,7 @@
         // 为各种用户活动事件重置计时器
         function setupInactivityTimer() {
           const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click', 'wheel'];
-          events.forEach(event => {
+          events.forEach(function(event) {
             document.addEventListener(event, resetInactivityTimer, true);
           });
           resetInactivityTimer(); // 初始化计时器
