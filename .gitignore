@@ -1,3 +1,1 @@
-(index.html is a source file, so no changes needed to .gitignore)
-
-# No changes required - only source/config files detected
+Nothing needs to be added to .gitignore since the changes only include source/config files (HTML and markdown files) without any build artifacts, dependencies, or temporary files.
