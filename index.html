@@ -548,16 +548,17 @@
     function getHlsConfigForNetwork(networkQuality) {
       const baseConfig = {
         // 缓冲区优化 - 优化卡顿问题
-        backBufferLength: 60, // 增加后缓冲区，减少卡顿
-        maxBufferLength: 90, // 增加最大缓冲区长度，提高流畅度
-        maxMaxBufferLength: 120, // 最大缓冲区长度上限
+        backBufferLength: 90, // 增加后缓冲区，减少卡顿
+        maxBufferLength: 120, // 增加最大缓冲区长度，提高流畅度
+        maxMaxBufferLength: 180, // 最大缓冲区长度上限
         // 加载策略 - 优化卡顿问题
-        liveSyncDurationCount: 6, // 增加直播同步片段数，提高稳定性
-        maxLoadingDelay: 4, // 增加加载延迟，避免频繁加载
-        maxStarvationDelay: 4, // 增加饥饿延迟，减少卡顿
+        liveSyncDurationCount: 8, // 增加直播同步片段数，提高稳定性
+        liveMaxLatencyDurationCount: 16, // 设置最大延迟片段数
+        maxLoadingDelay: 8, // 增加加载延迟，避免频繁加载
+        maxStarvationDelay: 8, // 增加饥饿延迟，减少卡顿
         // 自适应码率 - 针对卡顿问题优化
-        abrEwmaFastLive: 3.0, // 调整快速带宽估算时间常数，更平滑切换
-        abrEwmaSlowLive: 8.0, // 调整慢速带宽估算时间常数，避免频繁切换
+        abrEwmaFastLive: 4.0, // 调整快速带宽估算时间常数，更平滑切换
+        abrEwmaSlowLive: 12.0, // 调整慢速带宽估算时间常数，避免频繁切换
         abrEwmaDefaultEstimate: 5e5, // 默认带宽估算 (500 kbps)
         abrBandWidthFactor: 0.85, // 带宽使用因子
         abrBandWidthUpFactor: 0.7, // 上调带宽因子，更保守
@@ -571,50 +572,71 @@
         forceKeyFrameOnDiscontinuity: true,
         // 网络请求优化
         maxBufferHole: 0.01, // 减小缓冲间隙，提高连续性
-        highBufferWatchdogPeriod: 2, // 增加高缓冲监控周期
-        nudgeMaxRetry: 3, // 增加同步重试次数
-        maxFragLookUpTolerance: 0.01, // 减小片段查找容差
+        highBufferWatchdogPeriod: 3, // 增加高缓冲监控周期
+        nudgeMaxRetry: 5, // 增加同步重试次数
+        maxFragLookUpTolerance: 0.005, // 减小片段查找容差
         // 优化加载行为
         startFragPrefetch: true, // 预加载第一个片段
         testBandwidth: true, // 测试带宽以选择合适的质量
         // 错误处理优化
         nudgeOffset: 0.05, // 减小调整同步偏移
+        nudgeRetry: 6, // 调整重试次数
         // 启用网络优化
         xhrSetup: function (xhr, url) {
           // 允许跨域请求，添加移动端网络优化
           xhr.withCredentials = false;
           // 设置请求超时时间
-          xhr.timeout = 20000; // 20秒超时，给更多时间加载
+          xhr.timeout = 30000; // 30秒超时，给更多时间加载
         },
         // 启用后处理以优化性能
-        fragLoadingTimeOut: 20000, // 片段加载超时
-        fragLoadingMaxRetry: 6, // 片段加载最大重试次数
-        fragLoadingMaxRetryTimeout: 60000, // 片段加载最大重试超时
-        levelLoadingTimeOut: 20000, // 级别加载超时
-        levelLoadingMaxRetry: 6, // 级别加载最大重试次数
-        levelLoadingMaxRetryTimeout: 60000, // 级别加载最大重试超时
+        fragLoadingTimeOut: 30000, // 片段加载超时
+        fragLoadingMaxRetry: 10, // 片段加载最大重试次数
+        fragLoadingMaxRetryTimeout: 120000, // 片段加载最大重试超时
+        levelLoadingTimeOut: 30000, // 级别加载超时
+        levelLoadingMaxRetry: 10, // 级别加载最大重试次数
+        levelLoadingMaxRetryTimeout: 120000, // 级别加载最大重试超时
         // 其他优化参数
-        maxBufferSize: 60 * 1000 * 1000, // 最大缓冲区大小 60MB
-        appendErrorMaxRetry: 3, // 追加错误最大重试次数
+        maxBufferSize: 100 * 1000 * 1000, // 最大缓冲区大小 100MB
+        appendErrorMaxRetry: 6, // 追加错误最大重试次数
         enableSoftwareAES: true, // 启用软件AES解密
-        manifestLoadingTimeOut: 20000, // 清单加载超时
-        manifestLoadingMaxRetry: 3, // 清单加载最大重试次数
-        manifestLoadingMaxRetryTimeout: 64000, // 清单加载最大重试超时
+        manifestLoadingTimeOut: 30000, // 清单加载超时
+        manifestLoadingMaxRetry: 6, // 清单加载最大重试次数
+        manifestLoadingMaxRetryTimeout: 120000, // 清单加载最大重试超时
         levelLoadingLoadPolicy: { // 级别加载策略
           default: {
-            maxTimeToFirstByte: 10000,
-            maxLoadTime: 20000,
-            timeoutRetryDelay: 1000,
-            errorRetryDelay: 2000
+            maxTimeToFirstByte: 15000,
+            maxLoadTime: 30000,
+            timeoutRetryDelay: 2000,
+            errorRetryDelay: 3000
           }
         },
         fragLoadingLoadPolicy: { // 片段加载策略
           default: {
-            maxTimeToFirstByte: 10000,
-            maxLoadTime: 20000,
-            timeoutRetryDelay: 1000,
-            errorRetryDelay: 2000
+            maxTimeToFirstByte: 15000,
+            maxLoadTime: 30000,
+            timeoutRetryDelay: 2000,
+            errorRetryDelay: 3000
           }
+        },
+        // 启用性能指标收集
+        enableStats: true,
+        // 优化音视频同步
+        avBufferOffset: 0.1,
+        maxSeekHole: 2,
+        // 优化解码器
+        enableCEA708Captions: true,
+        enableEMSG: true,
+        emeEnabled: false, // 不启用加密媒体扩展
+        capLevelOnFPSDrop: false, // 不因帧率下降而限制质量
+        capLevelToPlayerSize: false, // 不根据播放器尺寸限制质量
+        initialLiveManifestSize: 1, // 初始直播清单大小
+        smoothLiveSegments: true, // 平滑直播片段切换
+        allowSeeksWithinDiscontinuities: false, // 避免在不连续处跳跃
+        // 启用缓冲区优化
+        maxBufferHoleMin: 0.005,
+        gapControllerOptions: {
+          maxBackBufferLength: 90,
+          gapThreshold: 0.5
         }
       };
 
@@ -622,27 +644,33 @@
       switch (networkQuality) {
         case 'poor':
           // 网络状况差时，更保守的配置
-          baseConfig.maxBufferLength = 20;
-          baseConfig.backBufferLength = 5;
-          baseConfig.abrBandWidthFactor = 0.6; // 更保守地选择质量
-          baseConfig.abrEwmaDefaultEstimate = 3e5; // 300 kbps
+          baseConfig.maxBufferLength = 30;
+          baseConfig.backBufferLength = 10;
+          baseConfig.abrBandWidthFactor = 0.5; // 更保守地选择质量
+          baseConfig.abrEwmaDefaultEstimate = 2e5; // 200 kbps
           baseConfig.startFragPrefetch = false; // 不预加载第一个片段以节省流量
+          baseConfig.fragLoadingMaxRetry = 15;
+          baseConfig.levelLoadingMaxRetry = 15;
           break;
         case 'moderate':
           // 中等网络状况
-          baseConfig.maxBufferLength = 30;
-          baseConfig.backBufferLength = 10;
+          baseConfig.maxBufferLength = 60;
+          baseConfig.backBufferLength = 20;
           baseConfig.abrBandWidthFactor = 0.7;
           baseConfig.abrEwmaDefaultEstimate = 5e5; // 500 kbps
           baseConfig.startFragPrefetch = true;
+          baseConfig.fragLoadingMaxRetry = 10;
+          baseConfig.levelLoadingMaxRetry = 10;
           break;
         case 'good':
           // 良好网络状况
-          baseConfig.maxBufferLength = 45;
-          baseConfig.backBufferLength = 15;
+          baseConfig.maxBufferLength = 90;
+          baseConfig.backBufferLength = 30;
           baseConfig.abrBandWidthFactor = 0.9;
-          baseConfig.abrEwmaDefaultEstimate = 1e6; // 1 Mbps
+          baseConfig.abrEwmaDefaultEstimate = 1.5e6; // 1.5 Mbps
           baseConfig.startFragPrefetch = true;
+          baseConfig.fragLoadingMaxRetry = 6;
+          baseConfig.levelLoadingMaxRetry = 6;
           break;
       }
 
@@ -923,12 +951,105 @@
 
       if (Hls.isSupported()) {
         hls = new Hls(hlsConfig);
+        
+        // 添加错误处理
+        hls.on(Hls.Events.ERROR, function (event, data) {
+          console.error('HLS Error:', data);
+          
+          switch (data.type) {
+            case Hls.ErrorTypes.NETWORK_ERROR:
+              console.log('Network error, trying to recover...');
+              // 根据错误类型进行不同的恢复策略
+              if (data.details === Hls.ErrorDetails.MANIFEST_LOAD_ERROR ||
+                  data.details === Hls.ErrorDetails.MANIFEST_LOAD_TIMEOUT) {
+                // 如果是清单加载错误，尝试重试或加载备用源
+                setTimeout(() => {
+                  if (hls) {
+                    hls.startLoad();
+                  }
+                }, 3000);
+              } else {
+                // 其他网络错误，尝试恢复
+                hls.recoverMediaError();
+              }
+              break;
+            case Hls.ErrorTypes.MEDIA_ERROR:
+              console.log('Media error, trying to recover...');
+              if (!data.fatal) {
+                // 非致命错误，尝试恢复
+                hls.recoverMediaError();
+              } else {
+                // 致命错误，重启播放
+                console.log('Fatal media error, restarting stream...');
+                hls.destroy();
+                setTimeout(() => {
+                  startVideo(m3u8, name, auto);
+                }, 3000);
+              }
+              break;
+            default:
+              // 未知错误类型，尝试重启
+              if (data.fatal) {
+                console.log('Fatal error, restarting stream...');
+                hls.destroy();
+                setTimeout(() => {
+                  startVideo(m3u8, name, auto);
+                }, 3000);
+              }
+              break;
+          }
+        });
+        
+        // 添加性能监控
+        hls.on(Hls.Events.FRAG_BUFFERED, function (event, data) {
+          // 监控片段缓冲情况
+          const stats = hls.stats;
+          if (stats) {
+            console.debug('Buffered fragment:', {
+              size: data.stats.total,
+              loading: data.stats.loading.end - data.stats.loading.start,
+              parsing: data.stats.parsing.end - data.stats.parsing.start,
+              buffering: data.stats.buffering.end - data.stats.buffering.start
+            });
+          }
+        });
+        
+        // 监控缓冲区状态
+        hls.on(Hls.Events.BUFFER_CREATED, function (event, data) {
+          console.debug('Buffer created');
+        });
+        
+        hls.on(Hls.Events.BUFFER_APPENDING, function (event, data) {
+          // 监控缓冲区追加
+        });
+        
+        hls.on(Hls.Events.BUFFER_FLUSHED, function (event, data) {
+          // 监控缓冲区清空
+          console.debug('Buffer flushed');
+        });
+        
+        // 监控级别变化
+        hls.on(Hls.Events.LEVEL_SWITCHED, function (event, data) {
+          console.debug('Level switched to:', data.level);
+        });
+        
         hls.loadSource(finalUrl);
         hls.attachMedia(video);
         hls.on(Hls.Events.MANIFEST_PARSED, setup);
       } else {
         video.src = finalUrl;
         video.onloadedmetadata = setup;
+        
+        // 为原生播放器添加错误处理
+        video.addEventListener('error', function(e) {
+          console.error('Video element error:', e);
+          // 尝试重新加载
+          setTimeout(() => {
+            if (video.networkState === HTMLMediaElement.NETWORK_NO_SOURCE) {
+              video.src = finalUrl;
+            }
+          }, 3000);
+        });
       }
       localStorage.setItem('current_video', JSON.stringify({ m3u8, name, videoId }));
     }
@@ -1155,25 +1276,50 @@
 
     // 自动刷新功能 - 长时间无操作后刷新页面
     let autoRefreshTimer = null;
-    const AUTO_REFRESH_TIME = 30 * 60 * 1000; // 30分钟无操作后刷新
+    const AUTO_REFRESH_TIME = 45 * 60 * 1000; // 45分钟无操作后刷新 (增加了时间间隔)
+    
+    // 页面活跃状态监测
+    let pageActive = true;
+    let lastActivityTime = Date.now();
 
     function resetAutoRefreshTimer() {
       if (autoRefreshTimer) {
         clearTimeout(autoRefreshTimer);
       }
+      
+      // 更新最后活动时间
+      lastActivityTime = Date.now();
+      
       autoRefreshTimer = setTimeout(() => {
-        console.log("页面长时间无操作，正在刷新...");
-        location.reload();
+        const inactiveTime = Date.now() - lastActivityTime;
+        if (inactiveTime >= AUTO_REFRESH_TIME) {
+          console.log("页面长时间无操作，正在刷新...");
+          // 在刷新前清理资源
+          if (hls) {
+            hls.stopLoad();
+            hls.detachMedia();
+          }
+          location.reload();
+        }
       }, AUTO_REFRESH_TIME);
     }
 
     // 监听用户活动事件
-    ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'touchmove'].forEach(eventType => {
+    ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'touchmove', 'click', 'focus', 'blur'].forEach(eventType => {
       document.addEventListener(eventType, resetAutoRefreshTimer, true);
     });
 
     // 初始化自动刷新计时器
     resetAutoRefreshTimer();
+    
+    // 定期检查页面状态
+    setInterval(() => {
+      const currentTime = Date.now();
+      const inactiveTime = currentTime - lastActivityTime;
+      if (inactiveTime >= AUTO_REFRESH_TIME * 0.8) { // 如果接近刷新时间，显示提醒
+        console.log(`页面将在 ${(AUTO_REFRESH_TIME - inactiveTime) / 60000 | 0} 分钟后刷新`);
+      }
+    }, 60000); // 每分钟检查一次
 
     window.onload = () => {
       // 为iOS设备添加特定CSS类
