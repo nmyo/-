@@ -1088,14 +1088,15 @@
         } else {
           playNext();
         }
-      // 检测是否为 iOS 设备
-      function isIOSDevice() {
-        return /iPad|iPhone|iPod/.test(navigator.userAgent) || 
-               (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); // 支持 iPadOS
-      }
+        
+        // 检测是否为 iOS 设备
+        function isIOSDevice() {
+          return /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                 (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); // 支持 iPadOS
+        }
 
-      // 设置事件监听器
-      function setupEventListeners() {
+        // 设置事件监听器
+        function setupEventListeners() {
         domCache.wrap.addEventListener('mousedown', (e) => {
           isDragging = true;
           wrapRect = domCache.wrap.getBoundingClientRect();
