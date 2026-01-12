@@ -1315,55 +1315,7 @@
         // 启动无操作自动刷新定时器
         setupInactivityTimer();
       }
+    })(); // 立即执行函数表达式结束
 
-      // DOM准备就绪后初始化
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => {
-          initDomCache();
-          
-          // 设置事件监听器
-          setupEventListeners();
-          
-          // 为iOS设备添加特定CSS类
-          if (isIOSDevice()) {
-            document.body.classList.add('ios-device');
-          }
-          
-          domCache.video.volume = 0.5;
-          domCache.video.muted = true; // 初始状态静音
-          updateVolUI();
-          const saved = localStorage.getItem('current_video');
-          if (saved) {
-            const data = JSON.parse(saved);
-            startVideo(data.m3u8, data.name, false);
-          } else {
-            playNext();
-          }
-        });
-      } else {
-        initDomCache();
-        
-        // 设置事件监听器
-        setupEventListeners();
-        
-        // 为iOS设备添加特定CSS类
-        if (isIOSDevice()) {
-          document.body.classList.add('ios-device');
-        }
-        
-        domCache.video.volume = 0.5;
-        domCache.video.muted = true; // 初始状态静音
-        updateVolUI();
-        const saved = localStorage.getItem('current_video');
-        if (saved) {
-          const data = JSON.parse(saved);
-          startVideo(data.m3u8, data.name, false);
-        } else {
-          playNext();
-        }
-      }
-    })();
-  </script>
-</body>
 
 </html>
