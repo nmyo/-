@@ -522,7 +522,7 @@
     let usedCodes = [];
     const API = "https://apiv.nyanx.de/";
     let wakeLock = null;
-    
+
     // 移动端网络状况检测
     function getNetworkQuality() {
       // 使用 Network Information API 检测网络状况
@@ -530,7 +530,7 @@
         const connection = navigator.connection;
         const effectiveType = connection.effectiveType || 'unknown';
         const downlink = connection.downlink || 0;
-        
+
         if (effectiveType === 'slow-2g' || effectiveType === '2g') {
           return 'poor';
         } else if (effectiveType === '3g' || downlink < 1.5) {
@@ -539,11 +539,11 @@
           return 'good';
         }
       }
-      
+
       // 如果不支持 Network Information API，返回默认值
       return 'unknown';
     }
-    
+
     // 根据网络状况调整HLS配置
     function getHlsConfigForNetwork(networkQuality) {
       const baseConfig = {
@@ -580,7 +580,7 @@
         // 错误处理优化
         nudgeOffset: 0.05, // 减小调整同步偏移
         // 启用网络优化
-        xhrSetup: function(xhr, url) {
+        xhrSetup: function (xhr, url) {
           // 允许跨域请求，添加移动端网络优化
           xhr.withCredentials = false;
           // 设置请求超时时间
@@ -617,9 +617,9 @@
           }
         }
       };
-      
+
       // 根据网络质量进一步调整配置
-      switch(networkQuality) {
+      switch (networkQuality) {
         case 'poor':
           // 网络状况差时，更保守的配置
           baseConfig.maxBufferLength = 20;
@@ -645,7 +645,7 @@
           baseConfig.startFragPrefetch = true;
           break;
       }
-      
+
       return baseConfig;
     }
 
@@ -655,7 +655,7 @@
         try {
           wakeLock = await navigator.wakeLock.request('screen');
           wakeLock.addEventListener('release', () => {
-  
+
           });
         } catch (err) {
           // 无法申请屏幕唤醒锁
@@ -710,20 +710,16 @@
         let url = "";
         const isSearch = keyword && keyword.trim() !== "";
         if (isSearch) {
-          url = `miss-random-search.php?title=${encodeURIComponent(keyword.trim())}`;
+          url = `miss-search.php?title=${encodeURIComponent(keyword.trim())}`;
         } else {
-          if (usedCodes.length > 0) {
-            url = `miss-random-search.php?exclude=${usedCodes.join(',')}`;
-          } else {
-            url = `miss-random-search.php`;
-          }
+          url = `${API}?exclude=${usedCodes.join(',')}`;
         }
-        
+
         // 添加超时控制
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000);
-        
-        const res = await fetch(url, { 
+
+        const res = await fetch(url, {
           signal: controller.signal,
           method: 'GET',
           mode: 'cors',
@@ -731,13 +727,13 @@
             'Accept': 'application/json'
           }
         });
-        
+
         clearTimeout(timeoutId);
-        
+
         if (!res.ok) {
           throw new Error(`HTTP ${res.status}: ${res.statusText}`);
         }
-        
+
         const json = await res.json();
         let listData = [];
         if (isSearch) {
@@ -747,7 +743,7 @@
         } else {
           if (json.m3u8 || json.m3u8_url) listData = [json];
         }
-        
+
         if (listData.length > 0) {
           resultsList.innerHTML = '';
           listData.forEach(item => {
@@ -790,7 +786,7 @@
         } else {
           errorMessage = e.message;
         }
-        
+
         if (!keyword) {
           alert(errorMessage);
         } else {
@@ -808,23 +804,23 @@
       isLoaded = true;
       $('videoTitle').innerText = (name || "VIDEO").split('_')[0].toUpperCase();
       let finalUrl = m3u8.replace("https://surrit.com/", "/s1/");
-      
+
       // 创建基于URL的唯一ID用于存储播放历史
       const videoId = generateVideoId(m3u8);
-      
+
       // 获取当前网络状况并配置HLS参数
       const networkQuality = getNetworkQuality();
       const hlsConfig = getHlsConfigForNetwork(networkQuality);
-      
+
       const setup = () => {
         video.volume = volSlider.value;
         video.muted = true; // 确保每次加载视频时都是静音状态
         updateVolUI();
-        
+
         // 移动端性能优化
         video.setAttribute('playsinline', '');
         video.setAttribute('webkit-playsinline', '');
-        
+
         // 尝试从本地存储恢复播放位置
         const history = JSON.parse(localStorage.getItem('video_history') || '{}');
         if (history[videoId]) {
@@ -836,7 +832,7 @@
             video.currentTime = savedPosition;
           }
         }
-        
+
         // 监听元数据加载完成事件，此时可以获取准确的持续时间
         if (Hls.isSupported()) {
           // 在HLS模式下，我们监听LEVEL_LOADED事件来确认已缓存足够内容
@@ -844,7 +840,7 @@
             // 预缓存30秒内容
             preloadTimeRange(30);
           });
-          
+
           // 监听缓冲区更新事件，持续确保有足够的预加载内容
           hls.on(Hls.Events.BUFFER_APPENDED, () => {
             preloadTimeRange(30);
@@ -854,13 +850,13 @@
           video.addEventListener('loadeddata', () => {
             preloadTimeRange(30);
           });
-          
+
           // 监听时间更新，确保缓冲区充足
           video.addEventListener('timeupdate', () => {
             preloadTimeRange(30);
           });
         }
-        
+
         if (auto) {
           // 移动端优化：先静音播放以绕过自动播放限制
           video.muted = true;
@@ -892,7 +888,7 @@
           }
         }
       };
-      
+
       // 预缓存指定时间段的函数
       function preloadTimeRange(secondsToPreload) {
         // 这个函数用于确保指定秒数的内容已被缓冲
@@ -900,19 +896,19 @@
           try {
             const bufferedEnd = video.buffered.end(video.buffered.length - 1);
             const targetTime = Math.min(video.duration || Infinity, video.currentTime + secondsToPreload);
-            
+
             // 如果缓冲区未达到目标时间，则继续加载
             if (bufferedEnd < targetTime) {
               // HLS.js会自动管理缓冲区，这里主要是监控和记录
 
             }
-          } catch(e) {
+          } catch (e) {
             // 处理可能的错误，例如在视频加载初期buffered.end可能不可用
 
           }
         }
       }
-      
+
       // 生成视频的唯一ID用于存储播放历史
       function generateVideoId(url) {
         // 简单的哈希函数生成唯一ID
@@ -924,21 +920,21 @@
         }
         return url.length + '_' + Math.abs(hash).toString(36);
       }
-      
+
       if (Hls.isSupported()) {
-        hls = new Hls(hlsConfig); 
-        hls.loadSource(finalUrl); 
+        hls = new Hls(hlsConfig);
+        hls.loadSource(finalUrl);
         hls.attachMedia(video);
         hls.on(Hls.Events.MANIFEST_PARSED, setup);
       } else {
-        video.src = finalUrl; 
+        video.src = finalUrl;
         video.onloadedmetadata = setup;
       }
       localStorage.setItem('current_video', JSON.stringify({ m3u8, name, videoId }));
     }
 
     let wrapRect = null;
-    
+
     const handleProgress = (e, isFinal = false) => {
       const clientX = e.touches ? e.touches[0].clientX : e.clientX;
       const p = Math.max(0, Math.min(1, (clientX - wrapRect.left) / wrapRect.width));
@@ -951,31 +947,31 @@
       wrapRect = wrap.getBoundingClientRect();
       handleProgress(e);
     };
-    
+
     window.onmousemove = (e) => {
       if (isDragging) handleProgress(e);
     };
-    
+
     window.onmouseup = (e) => {
       if (isDragging) {
         isDragging = false;
         handleProgress(e, true);
       }
     };
-    
+
     wrap.ontouchstart = (e) => {
       isDragging = true;
       wrapRect = wrap.getBoundingClientRect();
       handleProgress(e);
     };
-    
+
     wrap.ontouchmove = (e) => {
       if (isDragging) {
         e.preventDefault();
         handleProgress(e);
       }
     };
-    
+
     wrap.ontouchend = (e) => {
       if (isDragging) {
         isDragging = false;
@@ -992,14 +988,14 @@
           const history = JSON.parse(localStorage.getItem('video_history') || '{}');
           // 使用视频ID作为键，而不是原始URL
           history[data.videoId] = video.currentTime;
-          
+
           // 如果视频播放完毕（接近结尾），则从历史记录中移除
           if (video.duration && video.currentTime > video.duration - 5) {
             delete history[data.videoId]; // 播放完毕后清除历史记录
           }
-          
+
           localStorage.setItem('video_history', JSON.stringify(history));
-        } catch(e) {
+        } catch (e) {
 
         }
       }
@@ -1033,10 +1029,10 @@
       releaseWakeLock();
     };
 
-    video.onended = () => { 
+    video.onended = () => {
       // 视频结束时释放屏幕唤醒锁
       releaseWakeLock();
-      
+
       // 从播放历史中清除当前视频的记录
       const currentVideo = localStorage.getItem('current_video');
       if (currentVideo) {
@@ -1045,8 +1041,8 @@
         delete history[data.videoId]; // 播放结束后清除历史记录
         localStorage.setItem('video_history', JSON.stringify(history));
       }
-      
-      playNext(); 
+
+      playNext();
     };
 
     $('screen').onclick = () => isLoaded ? (video.paused ? video.play() : video.pause()) : playNext();
@@ -1078,14 +1074,14 @@
 
     // 检测是否为 iOS 设备
     function isIOSDevice() {
-      return /iPad|iPhone|iPod/.test(navigator.userAgent) || 
-             (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); // 支持 iPadOS
+      return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); // 支持 iPadOS
     }
-    
+
     // 全屏状态变化事件监听
     document.addEventListener('fullscreenchange', () => {
       const playerNode = $('playerNode');
-      
+
       if (document.fullscreenElement) {
         // 进入全屏
         playerNode.classList.add('fullscreen');
@@ -1120,17 +1116,17 @@
       if (k.toLowerCase() === 'm') volBtn.click();
     });
 
-    searchInput.onkeydown = (e) => { 
+    searchInput.onkeydown = (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
-        playNext(searchInput.value.trim()); 
+        playNext(searchInput.value.trim());
       }
-      e.stopPropagation(); 
+      e.stopPropagation();
     };
     window.seek = s => video.currentTime += s;
 
     // 页面可见性变化事件监听 - 当用户切换标签页或最小化浏览器时暂停播放
-    document.addEventListener('visibilitychange', function() {
+    document.addEventListener('visibilitychange', function () {
       if (document.hidden) {
         // 页面变为不可见（切换到其他标签页、最小化或进入后台）
         if (!video.paused) {
@@ -1140,14 +1136,14 @@
     });
 
     // 页面失焦时暂停播放
-    window.addEventListener('blur', function() {
+    window.addEventListener('blur', function () {
       if (!video.paused) {
         video.pause();
       }
     });
-    
+
     // 页面获得焦点时可以选择恢复播放（可选功能）
-    window.addEventListener('focus', function() {
+    window.addEventListener('focus', function () {
       // 可根据需求决定是否自动恢复播放
       // video.play();
     });
@@ -1160,7 +1156,7 @@
     // 自动刷新功能 - 长时间无操作后刷新页面
     let autoRefreshTimer = null;
     const AUTO_REFRESH_TIME = 30 * 60 * 1000; // 30分钟无操作后刷新
-    
+
     function resetAutoRefreshTimer() {
       if (autoRefreshTimer) {
         clearTimeout(autoRefreshTimer);
@@ -1170,12 +1166,12 @@
         location.reload();
       }, AUTO_REFRESH_TIME);
     }
-    
+
     // 监听用户活动事件
     ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'touchmove'].forEach(eventType => {
       document.addEventListener(eventType, resetAutoRefreshTimer, true);
     });
-    
+
     // 初始化自动刷新计时器
     resetAutoRefreshTimer();
 
@@ -1184,7 +1180,7 @@
       if (isIOSDevice()) {
         document.body.classList.add('ios-device');
       }
-      
+
       video.volume = 0.5;
       video.muted = true; // 初始状态静音
       updateVolUI();
