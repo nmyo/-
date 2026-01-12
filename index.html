@@ -7,17 +7,14 @@
     content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Media</title>
   <meta name="referrer" content="no-referrer-when-downgrade">
-  
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.6.15/dist/hls.min.js"></script>
   <!-- 预加载关键资源 -->
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link rel="preconnect" href="https://apiv.nyanx.de" crossorigin>
-  
   <!-- 移动端优化 -->
   <meta name="format-detection" content="telephone=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
-  
-  <!-- 内联关键CSS -->
   <style>
     :root {
       --yt-red: #ff0000;
@@ -422,11 +419,6 @@
       border-radius: 20px;
       border: 1px solid var(--border-light);
     }
-    
-    /* 添加性能优化相关的CSS */
-    .video-wrapper video {
-      contain: layout style paint;
-    }
   </style>
 </head>
 
@@ -469,12 +461,12 @@
         </div>
 
         <div class="seek-row">
-          <button class="seek-btn" data-seek="-600">-10m</button>
-          <button class="seek-btn" data-seek="-60">-1m</button>
-          <button class="seek-btn" data-seek="-10">-10s</button>
-          <button class="seek-btn" data-seek="10">+10s</button>
-          <button class="seek-btn" data-seek="60">+1m</button>
-          <button class="seek-btn" data-seek="600">+10m</button>
+          <button class="seek-btn" onclick="window.seek(-600)">-10m</button>
+          <button class="seek-btn" onclick="window.seek(-60)">-1m</button>
+          <button class="seek-btn" onclick="window.seek(-10)">-10s</button>
+          <button class="seek-btn" onclick="window.seek(10)">+10s</button>
+          <button class="seek-btn" onclick="window.seek(60)">+1m</button>
+          <button class="seek-btn" onclick="window.seek(600)">+10m</button>
         </div>
 
         <div class="bottom-row">
@@ -521,801 +513,641 @@
     </div>
   </div>
 
-  <!-- 异步加载HLS库 -->
-  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.6.15/dist/hls.min.js" defer></script>
-  
   <script>
-    // 性能优化的JavaScript代码
-    (function() {
-      'use strict';
+    const $ = id => document.getElementById(id);
+    const video = $('video'), bar = $('progressBar'), buf = $('bufferBar'), wrap = $('progressWrap');
+    const volSlider = $('volSlider'), volBtn = $('volBtn'), searchInput = $('searchInput'), resultsList = $('resultsList');
+
+    let hls = null, isDragging = false, isLoaded = false;
+    let usedCodes = [];
+    const API = "https://apiv.nyanx.de/";
+    let wakeLock = null;
+    
+    // 移动端网络状况检测
+    function getNetworkQuality() {
+      // 使用 Network Information API 检测网络状况
+      if ('connection' in navigator) {
+        const connection = navigator.connection;
+        const effectiveType = connection.effectiveType || 'unknown';
+        const downlink = connection.downlink || 0;
+        
+        if (effectiveType === 'slow-2g' || effectiveType === '2g') {
+          return 'poor';
+        } else if (effectiveType === '3g' || downlink < 1.5) {
+          return 'moderate';
+        } else if (effectiveType === '4g' || downlink >= 1.5) {
+          return 'good';
+        }
+      }
       
-      // 缓存DOM元素引用
-      const domCache = {
-        $: id => document.getElementById(id),
-        video: null,
-        bar: null,
-        buf: null,
-        wrap: null,
-        volSlider: null,
-        volBtn: null,
-        searchInput: null,
-        resultsList: null,
-        centerPlayIcon: null,
-        loader: null,
-        playBtn: null,
-        nextBtn: null,
-        speedBtn: null,
-        speedMenu: null,
-        timeBox: null,
-        pIcon: null,
-        vIcon: null,
-        screen: null
+      // 如果不支持 Network Information API，返回默认值
+      return 'unknown';
+    }
+    
+    // 根据网络状况调整HLS配置
+    function getHlsConfigForNetwork(networkQuality) {
+      const baseConfig = {
+        // 缓冲区优化 - 减少缓冲区大小以适应移动端内存限制
+        backBufferLength: 10, // 减少后缓冲区，节省内存
+        maxBufferLength: 30, // 降低最大缓冲区长度，减少内存占用
+        maxMaxBufferLength: 60, // 最大缓冲区长度上限
+        // 加载策略 - 优化移动端网络适应性
+        liveSyncDurationCount: 3, // 减少直播同步片段数，降低延迟
+        maxLoadingDelay: 2, // 减少加载延迟
+        maxStarvationDelay: 2, // 减少饥饿延迟
+        // 自适应码率 - 针对移动端网络波动优化
+        abrEwmaFastLive: 2.0, // 增加快速带宽估算时间常数，更稳定
+        abrEwmaSlowLive: 5.0, // 增加慢速带宽估算时间常数，避免频繁切换
+        abrEwmaDefaultEstimate: 5e5, // 默认带宽估算 (500 kbps)
+        abrBandWidthFactor: 0.8, // 降低带宽使用因子，更保守地选择质量
+        abrBandWidthUpFactor: 0.9, // 上调带宽因子
+        // 性能优化
+        enableWorker: true, // 使用web worker解码，减少主线程阻塞
+        workerPath: null, // 使用默认worker路径
+        enableWebWorker: true,
+        lowLatencyMode: true, // 低延迟模式
+        progressive: true, // 启用渐进式下载
+        // 关键帧对齐
+        forceKeyFrameOnDiscontinuity: true,
+        // 网络请求优化
+        maxBufferHole: 0.1, // 减小缓冲间隙，提高连续性
+        highBufferWatchdogPeriod: 1, // 减少高缓冲监控周期
+        // 优化加载行为
+        startFragPrefetch: true, // 预加载第一个片段
+        testBandwidth: true, // 测试带宽以选择合适的质量
+        // 错误处理优化
+        nudgeOffset: 0.1, // 减小调整同步偏移
+        nudgeMaxRetry: 2, // 减少同步重试次数
+        maxFragLookUpTolerance: 0.1, // 减小片段查找容差
+        // 启用网络优化
+        xhrSetup: function(xhr, url) {
+          // 允许跨域请求，添加移动端网络优化
+          xhr.withCredentials = false;
+          // 设置请求超时时间
+          xhr.timeout = 10000; // 10秒超时
+        },
+        // 启用后处理以优化性能
+        fragLoadingTimeOut: 10000, // 片段加载超时
+        fragLoadingMaxRetry: 2, // 片段加载最大重试次数
+        fragLoadingMaxRetryTimeout: 30000, // 片段加载最大重试超时
+        levelLoadingTimeOut: 10000, // 级别加载超时
+        levelLoadingMaxRetry: 2, // 级别加载最大重试次数
+        levelLoadingMaxRetryTimeout: 30000 // 级别加载最大重试超时
       };
       
-      // 初始化DOM缓存
-      function initDomCache() {
-        domCache.video = domCache.$('video');
-        domCache.bar = domCache.$('progressBar');
-        domCache.buf = domCache.$('bufferBar');
-        domCache.wrap = domCache.$('progressWrap');
-        domCache.volSlider = domCache.$('volSlider');
-        domCache.volBtn = domCache.$('volBtn');
-        domCache.searchInput = domCache.$('searchInput');
-        domCache.resultsList = domCache.$('resultsList');
-        domCache.centerPlayIcon = domCache.$('centerPlayIcon');
-        domCache.loader = domCache.$('loader');
-        domCache.playBtn = domCache.$('playBtn');
-        domCache.nextBtn = domCache.$('nextBtn');
-        domCache.speedBtn = domCache.$('speedBtn');
-        domCache.speedMenu = domCache.$('speedMenu');
-        domCache.timeBox = domCache.$('timeBox');
-        domCache.pIcon = domCache.$('pIcon');
-        domCache.vIcon = domCache.$('vIcon');
-        domCache.screen = domCache.$('screen');
+      // 根据网络质量进一步调整配置
+      switch(networkQuality) {
+        case 'poor':
+          // 网络状况差时，更保守的配置
+          baseConfig.maxBufferLength = 20;
+          baseConfig.backBufferLength = 5;
+          baseConfig.abrBandWidthFactor = 0.6; // 更保守地选择质量
+          baseConfig.abrEwmaDefaultEstimate = 3e5; // 300 kbps
+          baseConfig.startFragPrefetch = false; // 不预加载第一个片段以节省流量
+          break;
+        case 'moderate':
+          // 中等网络状况
+          baseConfig.maxBufferLength = 30;
+          baseConfig.backBufferLength = 10;
+          baseConfig.abrBandWidthFactor = 0.7;
+          baseConfig.abrEwmaDefaultEstimate = 5e5; // 500 kbps
+          baseConfig.startFragPrefetch = true;
+          break;
+        case 'good':
+          // 良好网络状况
+          baseConfig.maxBufferLength = 45;
+          baseConfig.backBufferLength = 15;
+          baseConfig.abrBandWidthFactor = 0.9;
+          baseConfig.abrEwmaDefaultEstimate = 1e6; // 1 Mbps
+          baseConfig.startFragPrefetch = true;
+          break;
       }
       
-      let hls = null, isDragging = false, isLoaded = false;
-      let usedCodes = [];
-      const API = "https://apiv.nyanx.de/";
-      let wakeLock = null;
-      let animationFrameId = null;
-      let wrapRect = null;
-      
-      // 使用requestIdleCallback进行非关键任务处理
-      function scheduleIdleTask(callback) {
-        if ('requestIdleCallback' in window) {
-          requestIdleCallback(callback);
-        } else {
-          setTimeout(callback, 1);
-        }
-      }
-      
-      // 移动端网络状况检测
-      function getNetworkQuality() {
-        // 使用 Network Information API 检测网络状况
-        if ('connection' in navigator) {
-          const connection = navigator.connection;
-          const effectiveType = connection.effectiveType || 'unknown';
-          const downlink = connection.downlink || 0;
-          
-          if (effectiveType === 'slow-2g' || effectiveType === '2g') {
-            return 'poor';
-          } else if (effectiveType === '3g' || downlink < 1.5) {
-            return 'moderate';
-          } else if (effectiveType === '4g' || downlink >= 1.5) {
-            return 'good';
-          }
-        }
-        
-        // 如果不支持 Network Information API，返回默认值
-        return 'unknown';
-      }
-      
-      // 根据网络状况调整HLS配置
-      function getHlsConfigForNetwork(networkQuality) {
-        const baseConfig = {
-          // 缓冲区优化 - 优化播放流畅度
-          backBufferLength: 60, // 增加后缓冲区，改善卡顿问题
-          maxBufferLength: 90, // 增加最大缓冲区长度，减少卡顿
-          maxMaxBufferLength: 120, // 最大缓冲区长度上限
-          // 加载策略 - 优化网络适应性
-          liveSyncDurationCount: 3, // 减少直播同步片段数，降低延迟
-          maxLoadingDelay: 1, // 减少加载延迟
-          maxStarvationDelay: 1, // 减少饥饿延迟
-          // 自适应码率 - 针对网络波动优化
-          abrEwmaFastLive: 1.0, // 降低快速带宽估算时间常数，更稳定
-          abrEwmaSlowLive: 3.0, // 降低慢速带宽估算时间常数，避免频繁切换
-          abrEwmaDefaultEstimate: 5e5, // 默认带宽估算 (500 kbps)
-          abrBandWidthFactor: 0.8, // 降低带宽使用因子，更保守地选择质量
-          abrBandWidthUpFactor: 0.9, // 上调带宽因子
-          // 性能优化
-          enableWorker: true, // 使用web worker解码，减少主线程阻塞
-          enableWebWorker: true,
-          lowLatencyMode: true, // 低延迟模式
-          progressive: true, // 启用渐进式下载
-          // 关键帧对齐
-          forceKeyFrameOnDiscontinuity: true,
-          // 网络请求优化
-          maxBufferHole: 0.01, // 减小缓冲间隙，提高连续性
-          highBufferWatchdogPeriod: 3, // 减少高缓冲监控周期
-          nudgeMaxRetry: 3, // 增加重试次数
-          // 优化加载行为
-          startFragPrefetch: true, // 预加载第一个片段
-          testBandwidth: true, // 测试带宽以选择合适的质量
-          // 错误处理优化
-          nudgeOffset: 0.05, // 减小调整同步偏移
-          maxFragLookUpTolerance: 0.01, // 减小片段查找容差
-          // 网络优化
-          xhrSetup: function(xhr, url) {
-            // 允许跨域请求，添加网络优化
-            xhr.withCredentials = false;
-            // 设置请求超时时间
-            xhr.timeout = 20000; // 20秒超时，给网络更多时间
-          },
-          // 片段加载优化
-          fragLoadingTimeOut: 20000, // 片段加载超时
-          fragLoadingMaxRetry: 6, // 片段加载最大重试次数
-          fragLoadingMaxRetryTimeout: 60000, // 片段加载最大重试超时
-          levelLoadingTimeOut: 20000, // 级别加载超时
-          levelLoadingMaxRetry: 4, // 级别加载最大重试次数
-          levelLoadingMaxRetryTimeout: 60000, // 级别加载最大重试超时
-          // 清单加载优化
-          manifestLoadingTimeOut: 20000,
-          manifestLoadingMaxRetry: 3,
-          manifestLoadingMaxRetryTimeout: 60000,
-          // 禁用不必要的特性以提升性能
-          enableCEA708Captions: false, // 禁用字幕以减少处理负担
-          enableIMSC1: false, // 禁用IMSC1字幕
-          enableTextTracks: false, // 禁用文本轨道
-          timelineLifter: true, // 启用时间线提升以改善同步
-          capLevelOnFPSDrop: false, // 不根据FPS降级
-          capLevelToPlayerSize: false, // 不根据播放器尺寸降级
-          // 优化初始加载
-          initialLiveManifestSize: 1, // 初始直播清单大小
-          liveDurationInfinity: false, // 不允许无限持续时间
-          liveBackBufferLength: 90 // 直播后缓冲长度
-        };
-        
-        // 根据网络质量进一步调整配置
-        switch(networkQuality) {
-          case 'poor':
-            // 网络状况差时，更保守的配置
-            baseConfig.maxBufferLength = 20;
-            baseConfig.backBufferLength = 5;
-            baseConfig.abrBandWidthFactor = 0.6; // 更保守地选择质量
-            baseConfig.abrEwmaDefaultEstimate = 3e5; // 300 kbps
-            baseConfig.startFragPrefetch = false; // 不预加载第一个片段以节省流量
-            break;
-          case 'moderate':
-            // 中等网络状况
-            baseConfig.maxBufferLength = 30;
-            baseConfig.backBufferLength = 10;
-            baseConfig.abrBandWidthFactor = 0.7;
-            baseConfig.abrEwmaDefaultEstimate = 5e5; // 500 kbps
-            baseConfig.startFragPrefetch = true;
-            break;
-          case 'good':
-            // 良好网络状况
-            baseConfig.maxBufferLength = 45;
-            baseConfig.backBufferLength = 15;
-            baseConfig.abrBandWidthFactor = 0.9;
-            baseConfig.abrEwmaDefaultEstimate = 1e6; // 1 Mbps
-            baseConfig.startFragPrefetch = true;
-            break;
-        }
-        
-        return baseConfig;
-      }
+      return baseConfig;
+    }
 
-      // 申请屏幕唤醒锁
-      async function requestWakeLock() {
-        if ('wakeLock' in navigator) {
-          try {
-            wakeLock = await navigator.wakeLock.request('screen');
-            wakeLock.addEventListener('release', () => {
-            });
-          } catch (err) {
-            // 无法申请屏幕唤醒锁
-          }
-        } else {
-        }
-      }
-
-      // 释放屏幕唤醒锁
-      function releaseWakeLock() {
-        if (wakeLock) {
-          wakeLock.release();
-          wakeLock = null;
-        }
-      }
-
-      // 时间格式化函数
-      const fmt = s => {
-        if (!s || isNaN(s)) return "0:00";
-        const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = Math.floor(s % 60);
-        return h > 0 ? `${h}:${m < 10 ? '0' + m : m}:${r < 10 ? '0' + r : r}` : `${m}:${r < 10 ? '0' + r : r}`;
-      };
-
-      // 更新音量UI
-      function updateVolUI() {
-        const v = domCache.video.volume, m = domCache.video.muted;
-        if (m || v === 0) {
-          domCache.vIcon.innerHTML = '<path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.39-.81.62-1.72.62-2.7 0-3.17-2.11-5.85-5-6.71v2.06c1.38.86 2.31 2.36 2.31 4.1s-.93 3.24-2.31 4.1v2.06c2.89-.86 5-3.54 5-6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.52.52-.89 1.15-1.14 1.83h2.06c.13-.27.33-.52.58-.77l.01-.01L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>';
-        } else if (v > 0.5) {
-          domCache.vIcon.innerHTML = '<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>';
-        } else {
-          domCache.vIcon.innerHTML = '<path d="M18.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM5 9v6h4l5 5V4L9 9H5z"/>';
-        }
-        domCache.volSlider.value = m ? 0 : v;
-      }
-
-      // 搜索和播放下一个视频
-      async function playNext(keyword = "") {
-        domCache.loader.classList.remove('hidden');
+    // 申请屏幕唤醒锁
+    async function requestWakeLock() {
+      if ('wakeLock' in navigator) {
         try {
-          let url = "";
-          const isSearch = keyword && keyword.trim() !== "";
-          if (isSearch) {
-            url = `miss-search.php?title=${encodeURIComponent(keyword.trim())}`;
-          } else {
-            url = `${API}?exclude=${usedCodes.join(',')}`;
-          }
-          
-          // 添加超时控制
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 30000);
-          
-          const res = await fetch(url, { 
-            signal: controller.signal,
-            method: 'GET',
-            mode: 'cors',
-            headers: {
-              'Accept': 'application/json'
-            }
+          wakeLock = await navigator.wakeLock.request('screen');
+          wakeLock.addEventListener('release', () => {
+  
           });
-          
-          clearTimeout(timeoutId);
-          
-          if (!res.ok) {
-            throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-          }
-          
-          const json = await res.json();
-          let listData = [];
-          if (isSearch) {
-            if (json.success && Array.isArray(json.data)) listData = json.data;
-            else if (Array.isArray(json)) listData = json;
-            else throw new Error('Invalid response format');
-          } else {
-            if (json.m3u8 || json.m3u8_url) listData = [json];
-          }
-          
-          if (listData.length > 0) {
-            domCache.resultsList.innerHTML = '';
-            listData.forEach(item => {
-              const div = document.createElement('div');
-              div.className = 'result-item';
-              const title = item.title || item.name || "未知视频";
-              const m3u8 = item.m3u8_url || item.m3u8;
-              if (isSearch) {
-                const regex = new RegExp(`(${keyword})`, 'gi');
-                div.innerHTML = title.replace(regex, '<b>$1</b>');
-              } else {
-                div.innerText = title;
-              }
-              div.onclick = (e) => {
-                e.stopPropagation();
-                startVideo(m3u8, title);
-                domCache.resultsList.style.display = 'none';
-                domCache.searchInput.value = '';
-              };
-              domCache.resultsList.appendChild(div);
-            });
-            if (isSearch) domCache.resultsList.style.display = 'block';
-            else if (!isSearch && listData.length === 1) startVideo(listData[0].m3u8_url || listData[0].m3u8, listData[0].title || listData[0].name);
-          } else if (isSearch) {
-            domCache.resultsList.innerHTML = '<div class="result-item">未找到相关视频</div>';
-            domCache.resultsList.style.display = 'block';
-          } else {
-          }
-        } catch (e) {
-          // 详细的错误处理
-          let errorMessage = "加载失败";
-          if (e.name === 'AbortError') {
-            errorMessage = "请求超时，请检查网络连接";
-          } else if (e.message.includes('Failed to fetch')) {
-            errorMessage = "网络连接失败，请检查网络设置";
-          } else if (e.message.includes('CORS')) {
-            errorMessage = "跨域请求被阻止，请使用代理或检查服务器配置";
-          } else {
-            errorMessage = e.message;
-          }
-          
-          if (!keyword) {
-            alert(errorMessage);
-          } else {
-            domCache.resultsList.innerHTML = `<div class="result-item">${errorMessage}</div>`;
-            domCache.resultsList.style.display = 'block';
-          }
-        } finally {
-          domCache.loader.classList.add('hidden');
+        } catch (err) {
+          // 无法申请屏幕唤醒锁
         }
-      }
-
-      // 开始播放视频
-      function startVideo(m3u8, name, auto = true) {
-        if (!m3u8) return;
-        if (hls) hls.destroy();
-        isLoaded = true;
-        domCache.$('videoTitle').innerText = (name || "VIDEO").split('_')[0].toUpperCase();
-        let finalUrl = m3u8.replace("https://surrit.com/", "/s1/");
-        
-        // 创建基于URL的唯一ID用于存储播放历史
-        const videoId = generateVideoId(m3u8);
-        
-        // 获取当前网络状况并配置HLS参数
-        const networkQuality = getNetworkQuality();
-        const hlsConfig = getHlsConfigForNetwork(networkQuality);
-        
-        const setup = () => {
-          domCache.video.volume = domCache.volSlider.value;
-          domCache.video.muted = true; // 确保每次加载视频时都是静音状态
-          updateVolUI();
-          
-          // 移动端性能优化
-          domCache.video.setAttribute('playsinline', '');
-          domCache.video.setAttribute('webkit-playsinline', '');
-          
-          // 尝试从本地存储恢复播放位置
-          const history = JSON.parse(localStorage.getItem('video_history') || '{}');
-          if (history[videoId]) {
-            // 检查视频是否接近结尾，如果是则从头开始播放
-            const savedPosition = history[videoId];
-            if (domCache.video.duration && savedPosition > domCache.video.duration - 10) {
-              domCache.video.currentTime = 0; // 如果距离结尾不到10秒，则从头开始
-            } else {
-              domCache.video.currentTime = savedPosition;
-            }
-          }
-          
-          // 监听元数据加载完成事件，此时可以获取准确的持续时间
-          if (Hls.isSupported()) {
-            // 在HLS模式下，我们监听LEVEL_LOADED事件来确认已缓存足够内容
-            hls.on(Hls.Events.LEVEL_LOADED, () => {
-              // 预缓存30秒内容
-              preloadTimeRange(30);
-            });
-            
-            // 监听缓冲区更新事件，持续确保有足够的预加载内容
-            hls.on(Hls.Events.BUFFER_APPENDED, () => {
-              preloadTimeRange(30);
-            });
-          } else {
-            // 对于原生视频，直接尝试预缓存
-            domCache.video.addEventListener('loadeddata', () => {
-              preloadTimeRange(30);
-            });
-            
-            // 监听时间更新，确保缓冲区充足
-            domCache.video.addEventListener('timeupdate', () => {
-              preloadTimeRange(30);
-            });
-          }
-          
-          if (auto) {
-            // 移动端优化：先静音播放以绕过自动播放限制
-            domCache.video.muted = true;
-            updateVolUI();
-            const playPromise = domCache.video.play();
-            if (playPromise !== undefined) {
-              playPromise
-                .then(() => {
-                  // 播放成功
-                  domCache.centerPlayIcon.classList.add('hidden');
-                  // 如果用户之前设置了非静音，则恢复音量
-                  setTimeout(() => {
-                    if (!domCache.video.muted && domCache.video.volume > 0) {
-                      domCache.video.muted = false;
-                    }
-                  }, 1000);
-                })
-                .catch(error => {
-                  // 如果自动播放失败，尝试先静音再播放
-                  domCache.video.muted = true;
-                  updateVolUI();
-                  domCache.video.play().then(() => {
-                    domCache.centerPlayIcon.classList.add('hidden');
-                  }).catch(() => {
-                    // 如果仍然失败，显示播放按钮
-                    domCache.centerPlayIcon.classList.remove('hidden');
-                  });
-                });
-            }
-          }
-        };
-        
-        // 预缓存指定时间段的函数
-        function preloadTimeRange(secondsToPreload) {
-          // 这个函数用于确保指定秒数的内容已被缓冲
-          if (domCache.video.readyState >= 1 && domCache.video.buffered.length > 0) { // HAVE_METADATA及以上
-            try {
-              const bufferedEnd = domCache.video.buffered.end(domCache.video.buffered.length - 1);
-              const targetTime = Math.min(domCache.video.duration || Infinity, domCache.video.currentTime + secondsToPreload);
-              
-              // 如果缓冲区未达到目标时间，则继续加载
-              if (bufferedEnd < targetTime) {
-                // HLS.js会自动管理缓冲区，这里主要是监控和记录
-              }
-            } catch(e) {
-              // 处理可能的错误，例如在视频加载初期buffered.end可能不可用
-            }
-          }
-        }
-        
-        // 生成视频的唯一ID用于存储播放历史
-        function generateVideoId(url) {
-          // 简单的哈希函数生成唯一ID
-          let hash = 0;
-          for (let i = 0; i < url.length; i++) {
-            const char = url.charCodeAt(i);
-            hash = ((hash << 5) - hash) + char;
-            hash |= 0; // 转换为32位整数
-          }
-          return url.length + '_' + Math.abs(hash).toString(36);
-        }
-        
-        if (Hls.isSupported()) {
-          hls = new Hls(hlsConfig); 
-          hls.loadSource(finalUrl); 
-          hls.attachMedia(domCache.video);
-          hls.on(Hls.Events.MANIFEST_PARSED, setup);
-        } else {
-          domCache.video.src = finalUrl; 
-          domCache.video.onloadedmetadata = setup;
-        }
-        localStorage.setItem('current_video', JSON.stringify({ m3u8, name, videoId }));
-      }
-
-      // 进度条拖拽处理
-      const handleProgress = (e, isFinal = false) => {
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        const p = Math.max(0, Math.min(1, (clientX - wrapRect.left) / wrapRect.width));
-        domCache.bar.style.width = (p * 100) + "%";
-        if (isFinal) domCache.video.currentTime = p * domCache.video.duration;
-      };
-
-      // 防抖函数
-      function debounce(func, wait) {
-        let timeout;
-        return function executedFunction(...args) {
-          const later = () => {
-            clearTimeout(timeout);
-            func(...args);
-          };
-          clearTimeout(timeout);
-          timeout = setTimeout(later, wait);
-        };
-      }
-      
-      // 节流函数
-      function throttle(func, limit) {
-        let inThrottle;
-        return function() {
-          const args = arguments;
-          const context = this;
-          if (!inThrottle) {
-            func.apply(context, args);
-            inThrottle = true;
-            setTimeout(() => inThrottle = false, limit);
-          }
-        }
-      }
-
-      // 进度更新函数
-      const updateProgress = () => {
-        if (!domCache.video.paused && !isDragging) {
-          if (domCache.video.duration && domCache.video.duration > 0) {
-            domCache.bar.style.width = (domCache.video.currentTime / domCache.video.duration * 100) + "%";
-            if (domCache.video.buffered.length) domCache.buf.style.width = (domCache.video.buffered.end(domCache.video.buffered.length - 1) / domCache.video.duration * 100) + "%";
-          } else {
-            domCache.bar.style.width = "0%";
-            domCache.buf.style.width = "0%";
-          }
-          domCache.timeBox.innerText = `${fmt(domCache.video.currentTime)} / ${fmt(domCache.video.duration)}`;
-          animationFrameId = requestAnimationFrame(updateProgress);
-        }
-      };
-
-      // 页面可见性变化事件监听
-      document.addEventListener('visibilitychange', function() {
-        if (document.hidden) {
-          // 页面变为不可见（切换到其他标签页、最小化或进入后台）
-          if (!domCache.video.paused) {
-            domCache.video.pause();
-          }
-        }
-      });
-
-      // 页面失焦时暂停播放
-      window.addEventListener('blur', function() {
-        if (!domCache.video.paused) {
-          domCache.video.pause();
-        }
-      });
-      
-      // 页面获得焦点时可以选择恢复播放（可选功能）
-      window.addEventListener('focus', function() {
-        // 可根据需求决定是否自动恢复播放
-        // domCache.video.play();
-      });
-
-      // DOM准备就绪后初始化
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => {
-          initDomCache();
-          
-          // 为iOS设备添加特定CSS类
-          if (isIOSDevice()) {
-            document.body.classList.add('ios-device');
-          }
-          
-          domCache.video.volume = 0.5;
-          domCache.video.muted = true; // 初始状态静音
-          updateVolUI();
-          const saved = localStorage.getItem('current_video');
-          if (saved) {
-            const data = JSON.parse(saved);
-            startVideo(data.m3u8, data.name, false);
-          } else {
-            playNext();
-          }
-        });
       } else {
-        initDomCache();
-        
-        // 为iOS设备添加特定CSS类
-        if (isIOSDevice()) {
-          document.body.classList.add('ios-device');
-        }
-        
-        domCache.video.volume = 0.5;
-        domCache.video.muted = true; // 初始状态静音
-        updateVolUI();
-        const saved = localStorage.getItem('current_video');
-        if (saved) {
-          const data = JSON.parse(saved);
-          startVideo(data.m3u8, data.name, false);
-        } else {
-          playNext();
-        }
-        
-        // 检测是否为 iOS 设备
-        function isIOSDevice() {
-          return /iPad|iPhone|iPod/.test(navigator.userAgent) || 
-                 (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); // 支持 iPadOS
-        }
 
-        // 设置事件监听器
-        function setupEventListeners() {
-        domCache.wrap.addEventListener('mousedown', (e) => {
-          isDragging = true;
-          wrapRect = domCache.wrap.getBoundingClientRect();
-          handleProgress(e);
-        });
-        
-        window.addEventListener('mousemove', (e) => {
-          if (isDragging) handleProgress(e);
-        });
-        
-        window.addEventListener('mouseup', (e) => {
-          if (isDragging) {
-            isDragging = false;
-            handleProgress(e, true);
-          }
-        });
-        
-        domCache.wrap.addEventListener('touchstart', (e) => {
-          isDragging = true;
-          wrapRect = domCache.wrap.getBoundingClientRect();
-          handleProgress(e);
-        });
-        
-        domCache.wrap.addEventListener('touchmove', (e) => {
-          if (isDragging) {
-            e.preventDefault();
-            handleProgress(e);
-          }
-        });
-        
-        domCache.wrap.addEventListener('touchend', (e) => {
-          if (isDragging) {
-            isDragging = false;
-            handleProgress(e, true);
-          }
-        });
-
-        domCache.video.addEventListener('timeupdate', () => {
-          // 保存播放历史
-          const currentVideo = localStorage.getItem('current_video');
-          if (currentVideo && !isDragging) {
-            try {
-              const data = JSON.parse(currentVideo);
-              const history = JSON.parse(localStorage.getItem('video_history') || '{}');
-              // 使用视频ID作为键，而不是原始URL
-              history[data.videoId] = domCache.video.currentTime;
-              
-              // 如果视频播放完毕（接近结尾），则从历史记录中移除
-              if (domCache.video.duration && domCache.video.currentTime > domCache.video.duration - 5) {
-                delete history[data.videoId]; // 播放完毕后清除历史记录
-              }
-              
-              localStorage.setItem('video_history', JSON.stringify(history));
-            } catch(e) {
-            }
-          }
-        });
-
-        domCache.video.addEventListener('playing', () => {
-          domCache.pIcon.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
-          domCache.centerPlayIcon.classList.add('hidden');
-          // 视频播放时申请屏幕唤醒锁
-          requestWakeLock();
-          updateProgress();
-        });
-
-        domCache.video.addEventListener('pause', () => {
-          if (isLoaded) domCache.centerPlayIcon.classList.remove('hidden');
-          domCache.pIcon.innerHTML = '<path d="M8 5v14l11-7z"/>';
-          // 视频暂停时释放屏幕唤醒锁
-          releaseWakeLock();
-          if (animationFrameId) {
-            cancelAnimationFrame(animationFrameId);
-            animationFrameId = null;
-          }
-        });
-
-        domCache.video.addEventListener('ended', () => { 
-          // 视频结束时释放屏幕唤醒锁
-          releaseWakeLock();
-          
-          // 从播放历史中清除当前视频的记录
-          const currentVideo = localStorage.getItem('current_video');
-          if (currentVideo) {
-            const data = JSON.parse(currentVideo);
-            const history = JSON.parse(localStorage.getItem('video_history') || '{}');
-            delete history[data.videoId]; // 播放结束后清除历史记录
-            localStorage.setItem('video_history', JSON.stringify(history));
-          }
-          
-          playNext(); 
-        });
-
-        domCache.screen.addEventListener('click', () => isLoaded ? (domCache.video.paused ? domCache.video.play() : domCache.video.pause()) : playNext());
-        domCache.playBtn.addEventListener('click', () => isLoaded ? (domCache.video.paused ? domCache.video.play() : domCache.video.pause()) : playNext());
-        domCache.nextBtn.addEventListener('click', () => playNext());
-        domCache.speedBtn.addEventListener('click', (e) => { e.stopPropagation(); domCache.speedMenu.classList.toggle('show'); });
-        domCache.pipBtn.addEventListener('click', async () => {
-          try {
-            await domCache.video.requestPictureInPicture();
-          } catch (error) {
-          }
-        });
-
-        // 修复 iOS 全屏
-        domCache.fullBtn.addEventListener('click', () => {
-          const node = domCache.$('playerNode');
-          if (document.fullscreenElement) {
-            document.exitFullscreen();
-          } else if (domCache.video.webkitEnterFullscreen) {
-            // iOS iPhone 专用
-            domCache.video.webkitEnterFullscreen();
-          } else if (node.requestFullscreen) {
-            node.requestFullscreen();
-          } else if (node.webkitRequestFullscreen) {
-            node.webkitRequestFullscreen();
-          }
-        });
-        
-        // 全屏状态变化事件监听
-        document.addEventListener('fullscreenchange', () => {
-          const playerNode = domCache.$('playerNode');
-          
-          if (document.fullscreenElement) {
-            // 进入全屏
-            playerNode.classList.add('fullscreen');
-          } else {
-            // 退出全屏
-            playerNode.classList.remove('fullscreen');
-          }
-        });
-
-        domCache.volSlider.addEventListener('input', (e) => { 
-          domCache.video.volume = e.target.value; 
-          domCache.video.muted = (domCache.video.volume === 0); 
-          updateVolUI(); 
-        });
-        domCache.volBtn.addEventListener('click', () => { 
-          domCache.video.muted = !domCache.video.muted; 
-          updateVolUI(); 
-        });
-
-        // 速度选择事件监听
-        document.querySelectorAll('.speed-item').forEach(item => {
-          item.addEventListener('click', (e) => {
-            e.stopPropagation(); 
-            domCache.video.playbackRate = parseFloat(item.dataset.val);
-            domCache.speedBtn.innerText = item.dataset.val + 'x';
-            document.querySelectorAll('.speed-item').forEach(el => el.classList.remove('active'));
-            item.classList.add('active'); 
-            domCache.speedMenu.classList.remove('show');
-          });
-        });
-
-        // 键盘快捷键
-        document.addEventListener('keydown', (e) => {
-          if (document.activeElement === domCache.searchInput) return;
-          const k = e.key;
-          if ([' ', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(k)) e.preventDefault();
-          if (k === ' ' || k.toLowerCase() === 'k') isLoaded ? (domCache.video.paused ? domCache.video.play() : domCache.video.pause()) : playNext();
-          if (k === 'ArrowLeft') seek(-10);
-          if (k === 'ArrowRight') seek(10);
-          if (k === 'ArrowUp') { domCache.video.volume = Math.min(1, domCache.video.volume + 0.1); domCache.video.muted = false; updateVolUI(); }
-          if (k === 'ArrowDown') { domCache.video.volume = Math.max(0, domCache.video.volume - 0.1); updateVolUI(); }
-          if (k.toLowerCase() === 'f') domCache.fullBtn.click();
-          if (k.toLowerCase() === 'm') domCache.volBtn.click();
-        });
-
-        // 搜索框事件
-        domCache.searchInput.addEventListener('keydown', (e) => { 
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            playNext(domCache.searchInput.value.trim()); 
-          }
-          e.stopPropagation(); 
-        });
-        
-        // 跳转函数
-        window.seek = s => domCache.video.currentTime += s;
-
-        // 统一的跳转按钮事件处理
-        document.querySelectorAll('.seek-btn').forEach(btn => {
-          btn.addEventListener('click', (e) => {
-            const seekValue = parseInt(btn.dataset.seek);
-            window.seek(seekValue);
-          });
-        });
-
-        // 点击外部关闭菜单
-        window.addEventListener('click', (e) => {
-          if (!e.target.closest('.search-container')) domCache.resultsList.style.display = 'none';
-          domCache.speedMenu.classList.remove('show');
-        });
-
-        // 自动刷新功能 - 长时间无操作后刷新
-        let inactivityTimer;
-        const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30分钟无操作后刷新
-
-        function resetInactivityTimer() {
-          clearTimeout(inactivityTimer);
-          inactivityTimer = setTimeout(() => {
-            // 30分钟无操作后刷新页面
-            location.reload();
-          }, INACTIVITY_TIMEOUT);
-        }
-
-        // 为各种用户活动事件重置计时器
-        function setupInactivityTimer() {
-          const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click', 'wheel'];
-          events.forEach(function(event) {
-            document.addEventListener(event, resetInactivityTimer, true);
-          });
-          resetInactivityTimer(); // 初始化计时器
-        }
-
-        // 启动无操作自动刷新定时器
-        setupInactivityTimer();
       }
-    })(); // 立即执行函数表达式结束
+    }
 
+    // 释放屏幕唤醒锁
+    function releaseWakeLock() {
+      if (wakeLock) {
+        wakeLock.release();
+        wakeLock = null;
+      }
+    }
+
+    // 页面可见性变化时处理唤醒锁
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        // 页面隐藏时释放唤醒锁
+        releaseWakeLock();
+      } else if (!video.paused && isLoaded) {
+        // 页面可见且视频播放时重新申请唤醒锁
+        requestWakeLock();
+      }
+    });
+
+    const fmt = s => {
+      if (!s || isNaN(s)) return "0:00";
+      const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = Math.floor(s % 60);
+      return h > 0 ? `${h}:${m < 10 ? '0' + m : m}:${r < 10 ? '0' + r : r}` : `${m}:${r < 10 ? '0' + r : r}`;
+    };
+
+    function updateVolUI() {
+      const v = video.volume, m = video.muted;
+      const vIcon = $('vIcon');
+      if (m || v === 0) {
+        vIcon.innerHTML = '<path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.39-.81.62-1.72.62-2.7 0-3.17-2.11-5.85-5-6.71v2.06c1.38.86 2.31 2.36 2.31 4.1s-.93 3.24-2.31 4.1v2.06c2.89-.86 5-3.54 5-6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.52.52-.89 1.15-1.14 1.83h2.06c.13-.27.33-.52.58-.77l.01-.01L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>';
+      } else if (v > 0.5) {
+        vIcon.innerHTML = '<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>';
+      } else {
+        vIcon.innerHTML = '<path d="M18.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM5 9v6h4l5 5V4L9 9H5z"/>';
+      }
+      volSlider.value = m ? 0 : v;
+    }
+
+    async function playNext(keyword = "") {
+      const loader = $('loader');
+      loader.classList.remove('hidden');
+      try {
+        let url = "";
+        const isSearch = keyword && keyword.trim() !== "";
+        if (isSearch) {
+          url = `miss-search.php?title=${encodeURIComponent(keyword.trim())}`;
+        } else {
+          url = `${API}?exclude=${usedCodes.join(',')}`;
+        }
+        
+        // 添加超时控制
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
+        
+        const res = await fetch(url, { 
+          signal: controller.signal,
+          method: 'GET',
+          mode: 'cors',
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        }
+        
+        const json = await res.json();
+        let listData = [];
+        if (isSearch) {
+          if (json.success && Array.isArray(json.data)) listData = json.data;
+          else if (Array.isArray(json)) listData = json;
+          else throw new Error('Invalid response format');
+        } else {
+          if (json.m3u8 || json.m3u8_url) listData = [json];
+        }
+        
+        if (listData.length > 0) {
+          resultsList.innerHTML = '';
+          listData.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'result-item';
+            const title = item.title || item.name || "未知视频";
+            const m3u8 = item.m3u8_url || item.m3u8;
+            if (isSearch) {
+              const regex = new RegExp(`(${keyword})`, 'gi');
+              div.innerHTML = title.replace(regex, '<b>$1</b>');
+            } else {
+              div.innerText = title;
+            }
+            div.onclick = (e) => {
+              e.stopPropagation();
+              startVideo(m3u8, title);
+              resultsList.style.display = 'none';
+              searchInput.value = '';
+            };
+            resultsList.appendChild(div);
+          });
+          if (isSearch) resultsList.style.display = 'block';
+          else if (!isSearch && listData.length === 1) startVideo(listData[0].m3u8_url || listData[0].m3u8, listData[0].title || listData[0].name);
+        } else if (isSearch) {
+          resultsList.innerHTML = '<div class="result-item">未找到相关视频</div>';
+          resultsList.style.display = 'block';
+        } else {
+
+        }
+      } catch (e) {
+
+        // 详细的错误处理
+        let errorMessage = "加载失败";
+        if (e.name === 'AbortError') {
+          errorMessage = "请求超时，请检查网络连接";
+        } else if (e.message.includes('Failed to fetch')) {
+          errorMessage = "网络连接失败，请检查网络设置";
+        } else if (e.message.includes('CORS')) {
+          errorMessage = "跨域请求被阻止，请使用代理或检查服务器配置";
+        } else {
+          errorMessage = e.message;
+        }
+        
+        if (!keyword) {
+          alert(errorMessage);
+        } else {
+          resultsList.innerHTML = `<div class="result-item">${errorMessage}</div>`;
+          resultsList.style.display = 'block';
+        }
+      } finally {
+        loader.classList.add('hidden');
+      }
+    }
+
+    function startVideo(m3u8, name, auto = true) {
+      if (!m3u8) return;
+      if (hls) hls.destroy();
+      isLoaded = true;
+      $('videoTitle').innerText = (name || "VIDEO").split('_')[0].toUpperCase();
+      let finalUrl = m3u8.replace("https://surrit.com/", "/s1/");
+      
+      // 创建基于URL的唯一ID用于存储播放历史
+      const videoId = generateVideoId(m3u8);
+      
+      // 获取当前网络状况并配置HLS参数
+      const networkQuality = getNetworkQuality();
+      const hlsConfig = getHlsConfigForNetwork(networkQuality);
+      
+      const setup = () => {
+        video.volume = volSlider.value;
+        video.muted = true; // 确保每次加载视频时都是静音状态
+        updateVolUI();
+        
+        // 移动端性能优化
+        video.setAttribute('playsinline', '');
+        video.setAttribute('webkit-playsinline', '');
+        
+        // 尝试从本地存储恢复播放位置
+        const history = JSON.parse(localStorage.getItem('video_history') || '{}');
+        if (history[videoId]) {
+          // 检查视频是否接近结尾，如果是则从头开始播放
+          const savedPosition = history[videoId];
+          if (video.duration && savedPosition > video.duration - 10) {
+            video.currentTime = 0; // 如果距离结尾不到10秒，则从头开始
+          } else {
+            video.currentTime = savedPosition;
+          }
+        }
+        
+        // 监听元数据加载完成事件，此时可以获取准确的持续时间
+        if (Hls.isSupported()) {
+          // 在HLS模式下，我们监听LEVEL_LOADED事件来确认已缓存足够内容
+          hls.on(Hls.Events.LEVEL_LOADED, () => {
+            // 预缓存30秒内容
+            preloadTimeRange(30);
+          });
+          
+          // 监听缓冲区更新事件，持续确保有足够的预加载内容
+          hls.on(Hls.Events.BUFFER_APPENDED, () => {
+            preloadTimeRange(30);
+          });
+        } else {
+          // 对于原生视频，直接尝试预缓存
+          video.addEventListener('loadeddata', () => {
+            preloadTimeRange(30);
+          });
+          
+          // 监听时间更新，确保缓冲区充足
+          video.addEventListener('timeupdate', () => {
+            preloadTimeRange(30);
+          });
+        }
+        
+        if (auto) {
+          // 移动端优化：先静音播放以绕过自动播放限制
+          video.muted = true;
+          updateVolUI();
+          const playPromise = video.play();
+          if (playPromise !== undefined) {
+            playPromise
+              .then(() => {
+                // 播放成功
+                $('centerPlayIcon').classList.add('hidden');
+                // 如果用户之前设置了非静音，则恢复音量
+                setTimeout(() => {
+                  if (!video.muted && video.volume > 0) {
+                    video.muted = false;
+                  }
+                }, 1000);
+              })
+              .catch(error => {
+                // 如果自动播放失败，尝试先静音再播放
+                video.muted = true;
+                updateVolUI();
+                video.play().then(() => {
+                  $('centerPlayIcon').classList.add('hidden');
+                }).catch(() => {
+                  // 如果仍然失败，显示播放按钮
+                  $('centerPlayIcon').classList.remove('hidden');
+                });
+              });
+          }
+        }
+      };
+      
+      // 预缓存指定时间段的函数
+      function preloadTimeRange(secondsToPreload) {
+        // 这个函数用于确保指定秒数的内容已被缓冲
+        if (video.readyState >= 1 && video.buffered.length > 0) { // HAVE_METADATA及以上
+          try {
+            const bufferedEnd = video.buffered.end(video.buffered.length - 1);
+            const targetTime = Math.min(video.duration || Infinity, video.currentTime + secondsToPreload);
+            
+            // 如果缓冲区未达到目标时间，则继续加载
+            if (bufferedEnd < targetTime) {
+              // HLS.js会自动管理缓冲区，这里主要是监控和记录
+
+            }
+          } catch(e) {
+            // 处理可能的错误，例如在视频加载初期buffered.end可能不可用
+
+          }
+        }
+      }
+      
+      // 生成视频的唯一ID用于存储播放历史
+      function generateVideoId(url) {
+        // 简单的哈希函数生成唯一ID
+        let hash = 0;
+        for (let i = 0; i < url.length; i++) {
+          const char = url.charCodeAt(i);
+          hash = ((hash << 5) - hash) + char;
+          hash |= 0; // 转换为32位整数
+        }
+        return url.length + '_' + Math.abs(hash).toString(36);
+      }
+      
+      if (Hls.isSupported()) {
+        hls = new Hls(hlsConfig); 
+        hls.loadSource(finalUrl); 
+        hls.attachMedia(video);
+        hls.on(Hls.Events.MANIFEST_PARSED, setup);
+      } else {
+        video.src = finalUrl; 
+        video.onloadedmetadata = setup;
+      }
+      localStorage.setItem('current_video', JSON.stringify({ m3u8, name, videoId }));
+    }
+
+    let wrapRect = null;
+    
+    const handleProgress = (e, isFinal = false) => {
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const p = Math.max(0, Math.min(1, (clientX - wrapRect.left) / wrapRect.width));
+      bar.style.width = (p * 100) + "%";
+      if (isFinal) video.currentTime = p * video.duration;
+    };
+
+    wrap.onmousedown = (e) => {
+      isDragging = true;
+      wrapRect = wrap.getBoundingClientRect();
+      handleProgress(e);
+    };
+    
+    window.onmousemove = (e) => {
+      if (isDragging) handleProgress(e);
+    };
+    
+    window.onmouseup = (e) => {
+      if (isDragging) {
+        isDragging = false;
+        handleProgress(e, true);
+      }
+    };
+    
+    wrap.ontouchstart = (e) => {
+      isDragging = true;
+      wrapRect = wrap.getBoundingClientRect();
+      handleProgress(e);
+    };
+    
+    wrap.ontouchmove = (e) => {
+      if (isDragging) {
+        e.preventDefault();
+        handleProgress(e);
+      }
+    };
+    
+    wrap.ontouchend = (e) => {
+      if (isDragging) {
+        isDragging = false;
+        handleProgress(e, true);
+      }
+    };
+
+    video.ontimeupdate = () => {
+      // 保存播放历史
+      const currentVideo = localStorage.getItem('current_video');
+      if (currentVideo && !isDragging) {
+        try {
+          const data = JSON.parse(currentVideo);
+          const history = JSON.parse(localStorage.getItem('video_history') || '{}');
+          // 使用视频ID作为键，而不是原始URL
+          history[data.videoId] = video.currentTime;
+          
+          // 如果视频播放完毕（接近结尾），则从历史记录中移除
+          if (video.duration && video.currentTime > video.duration - 5) {
+            delete history[data.videoId]; // 播放完毕后清除历史记录
+          }
+          
+          localStorage.setItem('video_history', JSON.stringify(history));
+        } catch(e) {
+
+        }
+      }
+    };
+
+    video.onplaying = () => {
+      $('pIcon').innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+      $('centerPlayIcon').classList.add('hidden');
+      // 视频播放时申请屏幕唤醒锁
+      requestWakeLock();
+      const up = () => {
+        if (!video.paused && !isDragging) {
+          if (video.duration && video.duration > 0) {
+            bar.style.width = (video.currentTime / video.duration * 100) + "%";
+            if (video.buffered.length) buf.style.width = (video.buffered.end(video.buffered.length - 1) / video.duration * 100) + "%";
+          } else {
+            bar.style.width = "0%";
+            buf.style.width = "0%";
+          }
+          $('timeBox').innerText = `${fmt(video.currentTime)} / ${fmt(video.duration)}`;
+          requestAnimationFrame(up);
+        }
+      };
+      up();
+    };
+
+    video.onpause = () => {
+      if (isLoaded) $('centerPlayIcon').classList.remove('hidden');
+      $('pIcon').innerHTML = '<path d="M8 5v14l11-7z"/>';
+      // 视频暂停时释放屏幕唤醒锁
+      releaseWakeLock();
+    };
+
+    video.onended = () => { 
+      // 视频结束时释放屏幕唤醒锁
+      releaseWakeLock();
+      
+      // 从播放历史中清除当前视频的记录
+      const currentVideo = localStorage.getItem('current_video');
+      if (currentVideo) {
+        const data = JSON.parse(currentVideo);
+        const history = JSON.parse(localStorage.getItem('video_history') || '{}');
+        delete history[data.videoId]; // 播放结束后清除历史记录
+        localStorage.setItem('video_history', JSON.stringify(history));
+      }
+      
+      playNext(); 
+    };
+
+    $('screen').onclick = () => isLoaded ? (video.paused ? video.play() : video.pause()) : playNext();
+    $('playBtn').onclick = () => isLoaded ? (video.paused ? video.play() : video.pause()) : playNext();
+    $('nextBtn').onclick = () => playNext();
+    $('speedBtn').onclick = (e) => { e.stopPropagation(); $('speedMenu').classList.toggle('show'); };
+    $('pipBtn').onclick = async () => {
+      try {
+        await video.requestPictureInPicture();
+      } catch (error) {
+
+      }
+    };
+
+    // 修复 iOS 全屏
+    $('fullBtn').onclick = () => {
+      const node = $('playerNode');
+      if (document.fullscreenElement) {
+        document.exitFullscreen();
+      } else if (video.webkitEnterFullscreen) {
+        // iOS iPhone 专用
+        video.webkitEnterFullscreen();
+      } else if (node.requestFullscreen) {
+        node.requestFullscreen();
+      } else if (node.webkitRequestFullscreen) {
+        node.webkitRequestFullscreen();
+      }
+    };
+
+    // 检测是否为 iOS 设备
+    function isIOSDevice() {
+      return /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+             (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); // 支持 iPadOS
+    }
+    
+    // 全屏状态变化事件监听
+    document.addEventListener('fullscreenchange', () => {
+      const playerNode = $('playerNode');
+      
+      if (document.fullscreenElement) {
+        // 进入全屏
+        playerNode.classList.add('fullscreen');
+      } else {
+        // 退出全屏
+        playerNode.classList.remove('fullscreen');
+      }
+    });
+
+    volSlider.oninput = (e) => { video.volume = e.target.value; video.muted = (video.volume === 0); updateVolUI(); };
+    volBtn.onclick = () => { video.muted = !video.muted; updateVolUI(); };
+
+    document.querySelectorAll('.speed-item').forEach(i => {
+      i.onclick = (e) => {
+        e.stopPropagation(); video.playbackRate = parseFloat(i.dataset.val);
+        $('speedBtn').innerText = i.dataset.val + 'x';
+        document.querySelectorAll('.speed-item').forEach(el => el.classList.remove('active'));
+        i.classList.add('active'); $('speedMenu').classList.remove('show');
+      };
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (document.activeElement === searchInput) return;
+      const k = e.key;
+      if ([' ', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(k)) e.preventDefault();
+      if (k === ' ' || k.toLowerCase() === 'k') isLoaded ? (video.paused ? video.play() : video.pause()) : playNext();
+      if (k === 'ArrowLeft') seek(-10);
+      if (k === 'ArrowRight') seek(10);
+      if (k === 'ArrowUp') { video.volume = Math.min(1, video.volume + 0.1); video.muted = false; updateVolUI(); }
+      if (k === 'ArrowDown') { video.volume = Math.max(0, video.volume - 0.1); updateVolUI(); }
+      if (k.toLowerCase() === 'f') $('fullBtn').click();
+      if (k.toLowerCase() === 'm') volBtn.click();
+    });
+
+    searchInput.onkeydown = (e) => { 
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        playNext(searchInput.value.trim()); 
+      }
+      e.stopPropagation(); 
+    };
+    window.seek = s => video.currentTime += s;
+
+    // 页面可见性变化事件监听 - 当用户切换标签页或最小化浏览器时暂停播放
+    document.addEventListener('visibilitychange', function() {
+      if (document.hidden) {
+        // 页面变为不可见（切换到其他标签页、最小化或进入后台）
+        if (!video.paused) {
+          video.pause();
+        }
+      }
+    });
+
+    // 页面失焦时暂停播放
+    window.addEventListener('blur', function() {
+      if (!video.paused) {
+        video.pause();
+      }
+    });
+    
+    // 页面获得焦点时可以选择恢复播放（可选功能）
+    window.addEventListener('focus', function() {
+      // 可根据需求决定是否自动恢复播放
+      // video.play();
+    });
+
+    window.onclick = (e) => {
+      if (!e.target.closest('.search-container')) resultsList.style.display = 'none';
+      $('speedMenu').classList.remove('show');
+    };
+
+    window.onload = () => {
+      // 为iOS设备添加特定CSS类
+      if (isIOSDevice()) {
+        document.body.classList.add('ios-device');
+      }
+      
+      video.volume = 0.5;
+      video.muted = true; // 初始状态静音
+      updateVolUI();
+      const saved = localStorage.getItem('current_video');
+      if (saved) {
+        const data = JSON.parse(saved);
+        startVideo(data.m3u8, data.name, false);
+      } else {
+        playNext();
+      }
+    };
+  </script>
+</body>
 
 </html>
