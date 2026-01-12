@@ -547,17 +547,17 @@
     // 根据网络状况调整HLS配置
     function getHlsConfigForNetwork(networkQuality) {
       const baseConfig = {
-        // 缓冲区优化 - 减少缓冲区大小以适应移动端内存限制
-        backBufferLength: 10, // 减少后缓冲区，节省内存
-        maxBufferLength: 30, // 降低最大缓冲区长度，减少内存占用
-        maxMaxBufferLength: 60, // 最大缓冲区长度上限
-        // 加载策略 - 优化移动端网络适应性
+        // 缓冲区优化 - 优化播放流畅度
+        backBufferLength: 60, // 增加后缓冲区，改善卡顿问题
+        maxBufferLength: 90, // 增加最大缓冲区长度，减少卡顿
+        maxMaxBufferLength: 120, // 最大缓冲区长度上限
+        // 加载策略 - 优化网络适应性
         liveSyncDurationCount: 3, // 减少直播同步片段数，降低延迟
-        maxLoadingDelay: 2, // 减少加载延迟
-        maxStarvationDelay: 2, // 减少饥饿延迟
-        // 自适应码率 - 针对移动端网络波动优化
-        abrEwmaFastLive: 2.0, // 增加快速带宽估算时间常数，更稳定
-        abrEwmaSlowLive: 5.0, // 增加慢速带宽估算时间常数，避免频繁切换
+        maxLoadingDelay: 1, // 减少加载延迟
+        maxStarvationDelay: 1, // 减少饥饿延迟
+        // 自适应码率 - 针对网络波动优化
+        abrEwmaFastLive: 1.0, // 降低快速带宽估算时间常数，更稳定
+        abrEwmaSlowLive: 3.0, // 降低慢速带宽估算时间常数，避免频繁切换
         abrEwmaDefaultEstimate: 5e5, // 默认带宽估算 (500 kbps)
         abrBandWidthFactor: 0.8, // 降低带宽使用因子，更保守地选择质量
         abrBandWidthUpFactor: 0.9, // 上调带宽因子
@@ -570,29 +570,45 @@
         // 关键帧对齐
         forceKeyFrameOnDiscontinuity: true,
         // 网络请求优化
-        maxBufferHole: 0.1, // 减小缓冲间隙，提高连续性
-        highBufferWatchdogPeriod: 1, // 减少高缓冲监控周期
+        maxBufferHole: 0.01, // 减小缓冲间隙，提高连续性
+        highBufferWatchdogPeriod: 3, // 减少高缓冲监控周期
+        nudgeMaxRetry: 3, // 增加重试次数
         // 优化加载行为
         startFragPrefetch: true, // 预加载第一个片段
         testBandwidth: true, // 测试带宽以选择合适的质量
         // 错误处理优化
-        nudgeOffset: 0.1, // 减小调整同步偏移
-        nudgeMaxRetry: 2, // 减少同步重试次数
-        maxFragLookUpTolerance: 0.1, // 减小片段查找容差
+        nudgeOffset: 0.05, // 减小调整同步偏移
+        maxFragLookUpTolerance: 0.01, // 减小片段查找容差
         // 启用网络优化
         xhrSetup: function(xhr, url) {
-          // 允许跨域请求，添加移动端网络优化
+          // 允许跨域请求，添加网络优化
           xhr.withCredentials = false;
           // 设置请求超时时间
-          xhr.timeout = 10000; // 10秒超时
+          xhr.timeout = 20000; // 20秒超时，给网络更多时间
         },
         // 启用后处理以优化性能
-        fragLoadingTimeOut: 10000, // 片段加载超时
-        fragLoadingMaxRetry: 2, // 片段加载最大重试次数
-        fragLoadingMaxRetryTimeout: 30000, // 片段加载最大重试超时
-        levelLoadingTimeOut: 10000, // 级别加载超时
-        levelLoadingMaxRetry: 2, // 级别加载最大重试次数
-        levelLoadingMaxRetryTimeout: 30000 // 级别加载最大重试超时
+        fragLoadingTimeOut: 20000, // 片段加载超时
+        fragLoadingMaxRetry: 6, // 片段加载最大重试次数
+        fragLoadingMaxRetryTimeout: 60000, // 片段加载最大重试超时
+        levelLoadingTimeOut: 20000, // 级别加载超时
+        levelLoadingMaxRetry: 4, // 级别加载最大重试次数
+        levelLoadingMaxRetryTimeout: 60000, // 级别加载最大重试超时
+        // 优化错误恢复
+        manifestLoadingTimeOut: 20000,
+        manifestLoadingMaxRetry: 3,
+        manifestLoadingMaxRetryTimeout: 60000,
+        // 启用更积极的错误恢复策略
+        enableCEA708Captions: false, // 禁用字幕以减少处理负担
+        enableIMSC1: false, // 禁用IMSC1字幕
+        enableTextTracks: false, // 禁用文本轨道
+        // 禁用不必要的特性以提升性能
+        timelineLifter: true, // 启用时间线提升以改善同步
+        capLevelOnFPSDrop: false, // 不根据FPS降级
+        capLevelToPlayerSize: false, // 不根据播放器尺寸降级
+        // 优化初始加载
+        initialLiveManifestSize: 1, // 初始直播清单大小
+        liveDurationInfinity: false, // 不允许无限持续时间
+        liveBackBufferLength: 90 // 直播后缓冲长度
       };
       
       // 根据网络质量进一步调整配置
@@ -1147,6 +1163,30 @@
         playNext();
       }
     };
+
+    // 自动刷新功能 - 长时间无操作后刷新页面
+    let inactivityTimer;
+    const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30分钟无操作后刷新
+
+    function resetInactivityTimer() {
+      clearTimeout(inactivityTimer);
+      inactivityTimer = setTimeout(() => {
+        // 30分钟无操作后刷新页面
+        location.reload();
+      }, INACTIVITY_TIMEOUT);
+    }
+
+    // 为各种用户活动事件重置计时器
+    function setupInactivityTimer() {
+      const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click', 'wheel'];
+      events.forEach(event => {
+        document.addEventListener(event, resetInactivityTimer, true);
+      });
+      resetInactivityTimer(); // 初始化计时器
+    }
+
+    // 启动无操作自动刷新定时器
+    setupInactivityTimer();
   </script>
 </body>
 
