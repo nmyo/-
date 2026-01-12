@@ -166,6 +166,13 @@
       align-items: center;
       justify-content: center;
       cursor: pointer;
+      /* 防止拖拽时的缩放和滚动 */
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-user-drag: none;
     }
 
     video {
@@ -181,6 +188,13 @@
       -webkit-perspective: 1000;
       backface-visibility: hidden;
       perspective: 1000;
+      /* 防止拖拽进度条时视频缩放 */
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-user-drag: none;
     }
 
     .controls-panel {
@@ -1083,13 +1097,17 @@
     };
 
     wrap.onmousedown = (e) => {
+      e.preventDefault();  // 防止默认行为
       isDragging = true;
       wrapRect = wrap.getBoundingClientRect();
       handleProgress(e);
     };
 
     window.onmousemove = (e) => {
-      if (isDragging) handleProgress(e);
+      if (isDragging) {
+        e.preventDefault();  // 防止拖拽过程中的默认行为
+        handleProgress(e);
+      }
     };
 
     window.onmouseup = (e) => {
@@ -1100,6 +1118,7 @@
     };
 
     wrap.ontouchstart = (e) => {
+      e.preventDefault();  // 防止触摸默认行为
       isDragging = true;
       wrapRect = wrap.getBoundingClientRect();
       handleProgress(e);
@@ -1108,6 +1127,7 @@
     wrap.ontouchmove = (e) => {
       if (isDragging) {
         e.preventDefault();
+        e.stopPropagation();
         handleProgress(e);
       }
     };
@@ -1254,6 +1274,25 @@
       if (k === 'ArrowDown') { video.volume = Math.max(0, video.volume - 0.1); updateVolUI(); }
       if (k.toLowerCase() === 'f') $('fullBtn').click();
       if (k.toLowerCase() === 'm') volBtn.click();
+    });
+    
+    // 防止在拖拽进度条时出现页面缩放
+    document.addEventListener('gesturestart', function(e) {
+      if (isDragging) {
+        e.preventDefault();
+      }
+    });
+    
+    document.addEventListener('gesturechange', function(e) {
+      if (isDragging) {
+        e.preventDefault();
+      }
+    });
+    
+    document.addEventListener('gestureend', function(e) {
+      if (isDragging) {
+        e.preventDefault();
+      }
     });
 
     searchInput.onkeydown = (e) => {
