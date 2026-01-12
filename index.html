@@ -712,7 +712,11 @@
         if (isSearch) {
           url = `miss-random-search.php?title=${encodeURIComponent(keyword.trim())}`;
         } else {
-          url = `miss-random-search.php?exclude=${usedCodes.join(',')}`;
+          if (usedCodes.length > 0) {
+            url = `miss-random-search.php?exclude=${usedCodes.join(',')}`;
+          } else {
+            url = `miss-random-search.php`;
+          }
         }
         
         // 添加超时控制
