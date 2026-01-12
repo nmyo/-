@@ -549,19 +549,19 @@
       const baseConfig = {
         // 缓冲区优化 - 优化卡顿问题
         backBufferLength: 90, // 增加后缓冲区，减少卡顿
-        maxBufferLength: 120, // 增加最大缓冲区长度，提高流畅度
-        maxMaxBufferLength: 180, // 最大缓冲区长度上限
+        maxBufferLength: 90, // 增加最大缓冲区长度，提高流畅度 (减少延迟)
+        maxMaxBufferLength: 120, // 最大缓冲区长度上限
         // 加载策略 - 优化卡顿问题
-        liveSyncDurationCount: 8, // 增加直播同步片段数，提高稳定性
-        liveMaxLatencyDurationCount: 16, // 设置最大延迟片段数
-        maxLoadingDelay: 8, // 增加加载延迟，避免频繁加载
-        maxStarvationDelay: 8, // 增加饥饿延迟，减少卡顿
+        liveSyncDurationCount: 6, // 适中同步片段数，平衡延迟和稳定性
+        liveMaxLatencyDurationCount: 12, // 设置最大延迟片段数
+        maxLoadingDelay: 6, // 增加加载延迟，避免频繁加载
+        maxStarvationDelay: 6, // 增加饥饿延迟，减少卡顿
         // 自适应码率 - 针对卡顿问题优化
-        abrEwmaFastLive: 4.0, // 调整快速带宽估算时间常数，更平滑切换
-        abrEwmaSlowLive: 12.0, // 调整慢速带宽估算时间常数，避免频繁切换
+        abrEwmaFastLive: 3.0, // 调整快速带宽估算时间常数，更平滑切换
+        abrEwmaSlowLive: 10.0, // 调整慢速带宽估算时间常数，避免频繁切换
         abrEwmaDefaultEstimate: 5e5, // 默认带宽估算 (500 kbps)
-        abrBandWidthFactor: 0.85, // 带宽使用因子
-        abrBandWidthUpFactor: 0.7, // 上调带宽因子，更保守
+        abrBandWidthFactor: 0.8, // 带宽使用因子
+        abrBandWidthUpFactor: 0.75, // 上调带宽因子，更保守
         // 性能优化
         enableWorker: true, // 使用web worker解码，减少主线程阻塞
         workerPath: null, // 使用默认worker路径
@@ -629,7 +629,6 @@
         emeEnabled: false, // 不启用加密媒体扩展
         capLevelOnFPSDrop: false, // 不因帧率下降而限制质量
         capLevelToPlayerSize: false, // 不根据播放器尺寸限制质量
-        initialLiveManifestSize: 1, // 初始直播清单大小
         smoothLiveSegments: true, // 平滑直播片段切换
         allowSeeksWithinDiscontinuities: false, // 避免在不连续处跳跃
         // 启用缓冲区优化
@@ -637,7 +636,10 @@
         gapControllerOptions: {
           maxBackBufferLength: 90,
           gapThreshold: 0.5
-        }
+        },
+        // 提前缓冲30秒
+        initialLiveManifestSize: 3,
+        startPosition: -30 // 开始播放时提前30秒开始（适用于直播）
       };
 
       // 根据网络质量进一步调整配置
@@ -927,12 +929,29 @@
 
             // 如果缓冲区未达到目标时间，则继续加载
             if (bufferedEnd < targetTime) {
-              // HLS.js会自动管理缓冲区，这里主要是监控和记录
-
+              // 对于HLS.js，通过调整配置可以实现更好的缓冲
+              // 这里可以动态调整缓冲区大小
+              if (hls) {
+                // 确保HLS.js配置中的缓冲区设置生效
+                if (hls.config.maxBufferLength < secondsToPreload + 30) {
+                  hls.config.maxBufferLength = secondsToPreload + 30;
+                }
+              }
+            }
+            
+            // 计算当前缓冲进度并更新界面
+            const bufferedStart = video.buffered.start(0);
+            const totalBuffered = bufferedEnd - bufferedStart;
+            const duration = video.duration || 1;
+            const bufferPercent = Math.min(100, (totalBuffered / duration) * 100);
+            
+            // 更新缓冲条
+            if (buf && bar && wrap) {
+              buf.style.width = bufferPercent + "%";
             }
           } catch (e) {
             // 处理可能的错误，例如在视频加载初期buffered.end可能不可用
-
+            console.warn("Error calculating buffer range:", e);
           }
         }
       }
