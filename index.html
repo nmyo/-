@@ -562,74 +562,74 @@
     function getHlsConfigForNetwork(networkQuality) {
       const baseConfig = {
         // 缓冲区优化 - 优化卡顿问题
-        backBufferLength: 90, // 增加后缓冲区，减少卡顿
-        maxBufferLength: 90, // 增加最大缓冲区长度，提高流畅度 (减少延迟)
-        maxMaxBufferLength: 120, // 最大缓冲区长度上限
+        backBufferLength: 60, // 减少后缓冲区，避免内存占用过高
+        maxBufferLength: 60, // 适中最大缓冲区长度，平衡流畅度和内存使用
+        maxMaxBufferLength: 90, // 最大缓冲区长度上限
         // 加载策略 - 优化卡顿问题
-        liveSyncDurationCount: 6, // 适中同步片段数，平衡延迟和稳定性
-        liveMaxLatencyDurationCount: 12, // 设置最大延迟片段数
-        maxLoadingDelay: 6, // 增加加载延迟，避免频繁加载
-        maxStarvationDelay: 6, // 增加饥饿延迟，减少卡顿
+        liveSyncDurationCount: 3, // 减少同步片段数，降低延迟
+        liveMaxLatencyDurationCount: 6, // 设置最大延迟片段数
+        maxLoadingDelay: 4, // 减少加载延迟，更快响应
+        maxStarvationDelay: 2, // 减少饥饿延迟，及时加载
         // 自适应码率 - 针对卡顿问题优化
-        abrEwmaFastLive: 3.0, // 调整快速带宽估算时间常数，更平滑切换
-        abrEwmaSlowLive: 10.0, // 调整慢速带宽估算时间常数，避免频繁切换
+        abrEwmaFastLive: 2.0, // 调整快速带宽估算时间常数，更平滑切换
+        abrEwmaSlowLive: 8.0, // 调整慢速带宽估算时间常数，避免频繁切换
         abrEwmaDefaultEstimate: 5e5, // 默认带宽估算 (500 kbps)
-        abrBandWidthFactor: 0.8, // 带宽使用因子
-        abrBandWidthUpFactor: 0.75, // 上调带宽因子，更保守
+        abrBandWidthFactor: 0.85, // 带宽使用因子
+        abrBandWidthUpFactor: 0.7, // 上调带宽因子，更保守
         // 性能优化
         enableWorker: true, // 使用web worker解码，减少主线程阻塞
         workerPath: null, // 使用默认worker路径
         enableWebWorker: true,
-        lowLatencyMode: false, // 关闭低延迟模式，提高稳定性
+        lowLatencyMode: true, // 启用低延迟模式，提高响应速度
         progressive: true, // 启用渐进式下载
         // 关键帧对齐
         forceKeyFrameOnDiscontinuity: true,
         // 网络请求优化
-        maxBufferHole: 0.01, // 减小缓冲间隙，提高连续性
-        highBufferWatchdogPeriod: 3, // 增加高缓冲监控周期
-        nudgeMaxRetry: 5, // 增加同步重试次数
-        maxFragLookUpTolerance: 0.005, // 减小片段查找容差
+        maxBufferHole: 0.05, // 略微增大缓冲间隙容忍度，避免频繁调整
+        highBufferWatchdogPeriod: 2, // 减少高缓冲监控周期
+        nudgeMaxRetry: 3, // 适当减少同步重试次数
+        maxFragLookUpTolerance: 0.01, // 略微增大片段查找容差
         // 优化加载行为
         startFragPrefetch: true, // 预加载第一个片段
         testBandwidth: true, // 测试带宽以选择合适的质量
         // 错误处理优化
-        nudgeOffset: 0.05, // 减小调整同步偏移
-        nudgeRetry: 6, // 调整重试次数
+        nudgeOffset: 0.1, // 略微增大调整同步偏移
+        nudgeRetry: 3, // 减少重试次数
         // 启用网络优化
         xhrSetup: function (xhr, url) {
           // 允许跨域请求，添加移动端网络优化
           xhr.withCredentials = false;
           // 设置请求超时时间
-          xhr.timeout = 30000; // 30秒超时，给更多时间加载
+          xhr.timeout = 20000; // 20秒超时，避免长时间等待
         },
         // 启用后处理以优化性能
-        fragLoadingTimeOut: 30000, // 片段加载超时
-        fragLoadingMaxRetry: 10, // 片段加载最大重试次数
-        fragLoadingMaxRetryTimeout: 120000, // 片段加载最大重试超时
-        levelLoadingTimeOut: 30000, // 级别加载超时
-        levelLoadingMaxRetry: 10, // 级别加载最大重试次数
-        levelLoadingMaxRetryTimeout: 120000, // 级别加载最大重试超时
+        fragLoadingTimeOut: 20000, // 片段加载超时
+        fragLoadingMaxRetry: 6, // 片段加载最大重试次数
+        fragLoadingMaxRetryTimeout: 60000, // 片段加载最大重试超时
+        levelLoadingTimeOut: 20000, // 级别加载超时
+        levelLoadingMaxRetry: 6, // 级别加载最大重试次数
+        levelLoadingMaxRetryTimeout: 60000, // 级别加载最大重试超时
         // 其他优化参数
-        maxBufferSize: 100 * 1000 * 1000, // 最大缓冲区大小 100MB
-        appendErrorMaxRetry: 6, // 追加错误最大重试次数
+        maxBufferSize: 60 * 1000 * 1000, // 最大缓冲区大小 60MB，避免内存问题
+        appendErrorMaxRetry: 3, // 追加错误最大重试次数
         enableSoftwareAES: true, // 启用软件AES解密
-        manifestLoadingTimeOut: 30000, // 清单加载超时
-        manifestLoadingMaxRetry: 6, // 清单加载最大重试次数
-        manifestLoadingMaxRetryTimeout: 120000, // 清单加载最大重试超时
+        manifestLoadingTimeOut: 20000, // 清单加载超时
+        manifestLoadingMaxRetry: 3, // 清单加载最大重试次数
+        manifestLoadingMaxRetryTimeout: 60000, // 清单加载最大重试超时
         levelLoadingLoadPolicy: { // 级别加载策略
           default: {
-            maxTimeToFirstByte: 15000,
-            maxLoadTime: 30000,
-            timeoutRetryDelay: 2000,
-            errorRetryDelay: 3000
+            maxTimeToFirstByte: 10000,
+            maxLoadTime: 20000,
+            timeoutRetryDelay: 1000,
+            errorRetryDelay: 2000
           }
         },
         fragLoadingLoadPolicy: { // 片段加载策略
           default: {
-            maxTimeToFirstByte: 15000,
-            maxLoadTime: 30000,
-            timeoutRetryDelay: 2000,
-            errorRetryDelay: 3000
+            maxTimeToFirstByte: 10000,
+            maxLoadTime: 20000,
+            timeoutRetryDelay: 1000,
+            errorRetryDelay: 2000
           }
         },
         // 启用性能指标收集
@@ -646,14 +646,14 @@
         smoothLiveSegments: true, // 平滑直播片段切换
         allowSeeksWithinDiscontinuities: false, // 避免在不连续处跳跃
         // 启用缓冲区优化
-        maxBufferHoleMin: 0.005,
+        maxBufferHoleMin: 0.01,
         gapControllerOptions: {
-          maxBackBufferLength: 90,
+          maxBackBufferLength: 60,
           gapThreshold: 0.5
         },
         // 提前缓冲30秒
         initialLiveManifestSize: 3,
-        startPosition: -30 // 开始播放时提前30秒开始（适用于直播）
+        startPosition: -15 // 开始播放时提前15秒开始（适用于直播）
       };
 
       // 根据网络质量进一步调整配置
@@ -1012,13 +1012,61 @@
           // 检查是否正在恢复中，避免重复处理
           if (data.details === 'bufferStalledError') {
             console.log('Buffer stalled, attempting recovery...');
-            // 对于缓冲停滞错误，尝试降低质量等级
-            if (hls && hls.nextLoadLevel > 0) {
-              hls.nextLoadLevel = Math.max(0, hls.nextLoadLevel - 1);
+            
+            // 检查当前缓冲区状态
+            if (video && video.buffered.length > 0) {
+              const currentTime = video.currentTime;
+              const buffered = video.buffered;
+              let bufferedEnd = 0;
+              
+              // 找到最远的缓冲结束点
+              for (let i = 0; i < buffered.length; i++) {
+                bufferedEnd = Math.max(bufferedEnd, buffered.end(i));
+              }
+              
+              const bufferGap = bufferedEnd - currentTime;
+              console.log(`Current buffer gap: ${bufferGap.toFixed(2)}s`);
+              
+              // 如果缓冲区确实很小，增加缓冲区配置
+              if (bufferGap < 5) { // 少于5秒的缓冲区
+                if (hls) {
+                  // 动态调整缓冲区配置
+                  hls.config.maxBufferLength = Math.min(hls.config.maxBufferLength + 30, 180);
+                  hls.config.backBufferLength = Math.min(hls.config.backBufferLength + 15, 60);
+                  
+                  // 尝试手动触发加载
+                  if (hls.media) {
+                    hls.loadLevel = hls.nextLoadLevel;
+                  }
+                }
+              }
             }
-            // 增加缓冲区大小以应对停滞
-            if (hls) {
-              hls.config.maxBufferLength = Math.min(hls.config.maxBufferLength + 30, 180);
+            
+            // 增加恢复尝试计数器
+            if (!this.recoveryAttempts) {
+              this.recoveryAttempts = 0;
+            }
+            
+            if (this.recoveryAttempts < 3) {
+              this.recoveryAttempts++;
+              console.log(`Recovery attempt ${this.recoveryAttempts}/3`);
+              
+              // 尝试恢复媒体错误
+              if (hls) {
+                hls.recoverMediaError();
+              }
+            } else {
+              // 多次尝试失败后，重新加载流
+              console.log('Multiple recovery attempts failed, reloading stream...');
+              this.recoveryAttempts = 0;
+              
+              // 重启播放器
+              if (hls) {
+                hls.destroy();
+                setTimeout(() => {
+                  startVideo(m3u8, name, auto);
+                }, 2000);
+              }
             }
             return;
           }
@@ -1155,41 +1203,93 @@
         
         const checkBufferHealth = () => {
           if (!video || !hls) return;
-          
+
           try {
             const buffered = video.buffered;
             const currentTime = video.currentTime;
             const duration = video.duration || Infinity;
-            
+
             if (buffered.length > 0) {
               const bufferedEnd = buffered.end(buffered.length - 1);
               const timeUntilEnd = duration - currentTime;
-              
+
               // 检查当前播放位置是否有足够的缓冲
               const bufferAhead = bufferedEnd - currentTime;
-              
-              // 如果缓冲不足且不是在播放末尾
-              if (bufferAhead < 10 && timeUntilEnd > 10) {
-                // 动态调整缓冲区长度
+
+              // 检查是否有足够的缓冲时间
+              if (bufferAhead < 15 && timeUntilEnd > 15) {
+                // 如果缓冲不足且不是在播放末尾，增加缓冲区长度
                 if (hls.config) {
-                  hls.config.maxBufferLength = Math.min(hls.config.maxBufferLength + 15, 180);
+                  hls.config.maxBufferLength = Math.min(hls.config.maxBufferLength + 10, 90);
+                  // 增加后缓冲区长度，避免频繁清理
+                  hls.config.backBufferLength = Math.min(hls.config.backBufferLength + 5, 30);
+                }
+                
+                // 检查网络状况并调整策略
+                const networkQuality = getNetworkQuality();
+                if (networkQuality === 'poor' || networkQuality === 'moderate') {
+                  // 在较差网络环境下，降低码率以保持流畅播放
+                  if (hls && hls.currentLevel > 0) {
+                    hls.currentLevel = Math.max(0, hls.currentLevel - 1);
+                  }
+                }
+              }
+
+              // 如果缓冲过多，适当减少以节省内存
+              if (bufferAhead > 60) {
+                if (hls.config) {
+                  hls.config.maxBufferLength = Math.max(hls.config.maxBufferLength - 10, 30);
                 }
               }
               
-              // 如果缓冲过多，适当减少以节省内存
-              if (bufferAhead > 90) {
-                if (hls.config) {
-                  hls.config.maxBufferLength = Math.max(hls.config.maxBufferLength - 15, 30);
+              // 检查是否有小的缓冲间隙
+              for (let i = 0; i < buffered.length; i++) {
+                const start = buffered.start(i);
+                const end = buffered.end(i);
+                
+                // 如果当前播放位置在缓冲区中，但接近末端，提前预加载
+                if (currentTime >= start && currentTime <= end && (end - currentTime) < 5) {
+                  // 触发预加载逻辑
+                  if (hls) {
+                    hls.trigger(Hls.Events.BUFFER_FLUSHED, { type: 'audio' });
+                    hls.trigger(Hls.Events.BUFFER_FLUSHED, { type: 'video' });
+                  }
                 }
               }
             }
-            
+
             // 检查播放状态是否正常
             if (!video.paused && video.readyState < 2) { // HAVE_CURRENT_DATA
               // 如果正在播放但没有足够数据，可能需要采取措施
               console.debug('Video playback may be stalled, readyState:', video.readyState);
             }
             
+            // 检查播放是否停滞
+            if (!video.paused && video.readyState >= 2) {
+              const buffered = video.buffered;
+              let hasCurrentBuffer = false;
+              
+              for (let i = 0; i < buffered.length; i++) {
+                if (currentTime >= buffered.start(i) && currentTime <= buffered.end(i)) {
+                  const remainingInBuffer = buffered.end(i) - currentTime;
+                  if (remainingInBuffer < 2) {
+                    // 剩余缓冲少于2秒，可能即将停滞
+                    console.debug('Low buffer detected, remaining:', remainingInBuffer.toFixed(2) + 's');
+                    // 触发缓冲区检查
+                    if (hls) {
+                      hls.trigger(Hls.Events.BUFFER_APPENDED, { stats: { total: 0 } });
+                    }
+                  }
+                  hasCurrentBuffer = true;
+                  break;
+                }
+              }
+              
+              if (!hasCurrentBuffer) {
+                console.warn('No buffer found at current time position');
+              }
+            }
+
           } catch (e) {
             console.warn('Error in buffer health check:', e);
           }
