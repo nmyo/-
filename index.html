@@ -1032,10 +1032,6 @@
 
     // 拖拽后预加载函数
     function preloadAfterSeek(seekTime) {
-      if (hls) {
-        // 拖拽后立即预加载更多内容
-        hls.nextLoadLevel = hls.nextLoadLevel || hls.currentLevel;
-      }
       // 确保拖拽后有足够的缓冲区
       setTimeout(() => {
         if (video.buffered.length > 0) {
@@ -1043,8 +1039,9 @@
           const needPreload = Math.min(video.duration || Infinity, seekTime + 30); // 预加载30秒内容，但不超过视频总长度
           if (bufferedEnd < needPreload) {
             // 触发加载更多内容
-            if (hls && hls.loadLevel) {
-              hls.loadLevel = hls.loadLevel; // 重新触发加载
+            if (hls) {
+              // 在HLS模式下，通过设置currentTime来触发加载更多内容
+              video.currentTime = video.currentTime; // 强制更新播放位置
             }
           }
         }
@@ -1052,35 +1049,34 @@
     }
 
     const handleProgress = (e, isFinal = false) => {
+      if (!wrapRect) wrapRect = wrap.getBoundingClientRect();
       const clientX = e.touches ? e.touches[0].clientX : e.clientX;
       const p = Math.max(0, Math.min(1, (clientX - wrapRect.left) / wrapRect.width));
-      bar.style.width = (p * 100) + "%";
+      const newTime = p * video.duration;
       
       if (isFinal) {
         // 拖拽结束时更新时间并触发预加载
-        const seekTime = p * video.duration;
-        video.currentTime = seekTime;
+        if (!isNaN(newTime) && video.duration > 0) {
+          video.currentTime = newTime;
+        }
         isDragging = false;
         
         // 拖拽完成后立即开始预加载后续内容
-        if (hls && hls.startLoad) {
-          // 重新开始加载以确保缓冲区正确
-          hls.startLoad(seekTime);
-        }
+        // 对于HLS和原生视频，设置currentTime就足够了，HLS.js会自动处理
         
         // 调用拖拽后预加载函数
-        preloadAfterSeek(seekTime);
+        preloadAfterSeek(newTime);
       } else if (isDragging) {
-        // 拖拽过程中仅更新UI，不改变播放时间
-        // 显示预览时间但不实际跳转
-        const previewTime = p * video.duration;
-        $('timeBox').innerText = `${fmt(previewTime)} / ${fmt(video.duration)}`;
+        // 拖拽过程中仅更新UI进度条和时间显示
+        bar.style.width = (p * 100) + "%";
+        $('timeBox').innerText = `${fmt(newTime)} / ${fmt(video.duration)}`;
       }
     };
 
     // 拖拽优化：分阶段处理，避免频繁seek
     wrap.onmousedown = (e) => {
       e.preventDefault(); // 防止默认行为干扰
+      if (!video.duration) return; // 没有视频时长则不处理
       isDragging = true;
       wrapRect = wrap.getBoundingClientRect();
       handleProgress(e);
@@ -1105,6 +1101,7 @@
 
     wrap.ontouchstart = (e) => {
       e.preventDefault();
+      if (!video.duration) return; // 没有视频时长则不处理
       isDragging = true;
       wrapRect = wrap.getBoundingClientRect();
       handleProgress(e);
