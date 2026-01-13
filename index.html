@@ -692,10 +692,11 @@
           setTimeout(() => {
             // 如果视频仍在播放但没有前进，则考虑刷新页面
             if (!video.paused && video.currentTime === lastCurrentTime) {
-              console.log('长时间缓冲停滞，即将刷新页面...');
-              setTimeout(() => {
-                location.reload();
-              }, 5000); // 5秒后刷新页面
+              console.log('长时间缓冲停滞，建议手动刷新页面...');
+              // 注释掉自动刷新功能，避免意外刷新
+              // setTimeout(() => {
+              //   location.reload();
+              // }, 5000); // 5秒后刷新页面
             }
           }, 5000);
         } else if (error.details === 'fragLoadError') {
@@ -732,11 +733,12 @@
           if (currentSrc) {
             startVideo(currentSrc, $('videoTitle').innerText, !video.paused);
           } else {
-            // 如果没有当前源，直接刷新页面
-            console.log('无法恢复播放器，正在刷新页面...');
-            setTimeout(() => {
-              location.reload();
-            }, 2000);
+            // 如果没有当前源，提示用户手动刷新页面
+            console.log('无法恢复播放器，可手动刷新页面...');
+            // 注释掉自动刷新功能，避免意外刷新
+            // setTimeout(() => {
+            //   location.reload();
+            // }, 2000);
           }
           break;
       }
@@ -1357,27 +1359,22 @@
       $('speedMenu').classList.remove('show');
     };
 
-    // 自动刷新功能 - 长时间无操作后刷新页面
-    let autoRefreshTimer = null;
-    const AUTO_REFRESH_TIME = 30 * 60 * 1000; // 30分钟无操作后刷新
+    // 自动刷新功能 - 长时间无操作后刷新页面 - 已禁用此功能
+    // let autoRefreshTimer = null;
+    // const AUTO_REFRESH_TIME = 30 * 60 * 1000; // 30分钟无操作后刷新
 
-    function resetAutoRefreshTimer() {
-      if (autoRefreshTimer) {
-        clearTimeout(autoRefreshTimer);
-      }
-      autoRefreshTimer = setTimeout(() => {
-        console.log("页面长时间无操作，正在刷新...");
-        location.reload();
-      }, AUTO_REFRESH_TIME);
-    }
+    // 由于禁用了自动刷新功能，不需要resetAutoRefreshTimer函数
+    // function resetAutoRefreshTimer() {
+    //   // 空函数或保留原有逻辑但不执行刷新
+    // }
 
-    // 监听用户活动事件
-    ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'touchmove'].forEach(eventType => {
-      document.addEventListener(eventType, resetAutoRefreshTimer, true);
-    });
+    // 由于禁用了自动刷新功能，不需要监听用户活动事件
+    // ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'touchmove'].forEach(eventType => {
+    //   document.addEventListener(eventType, resetAutoRefreshTimer, true);
+    // });
 
-    // 初始化自动刷新计时器
-    resetAutoRefreshTimer();
+    // 由于禁用了自动刷新功能，不需要初始化自动刷新计时器
+    // resetAutoRefreshTimer();
 
     window.onload = () => {
       // 为iOS设备添加特定CSS类
@@ -1444,9 +1441,10 @@
 
         // 开始检测卡顿
         stallDetectionTimer = setTimeout(() => {
-          console.log('检测到视频长时间卡顿，正在刷新页面...');
+          console.log('检测到视频长时间卡顿，建议手动刷新页面...');
+          // 注释掉自动刷新功能，避免意外刷新
           // 卡顿超过设定时间，刷新页面
-          location.reload();
+          // location.reload();
         }, 10000); // 10秒后如果仍然卡顿则刷新页面
       } else {
         // 播放正常，更新上次播放时间并清除定时器
