@@ -688,7 +688,16 @@
         // 对于缓冲停滞错误，增加一些缓冲配置
         if (error.details === 'bufferStalledError' || error.details === 'bufferNudgeOnStall') {
           console.warn('Handling buffer stall error...');
-          // 不需要特别处理，HLS.js会自动处理
+          // 检查当前播放状态，如果长时间卡顿则刷新页面
+          setTimeout(() => {
+            // 如果视频仍在播放但没有前进，则考虑刷新页面
+            if (!video.paused && video.currentTime === lastCurrentTime) {
+              console.log('长时间缓冲停滞，即将刷新页面...');
+              setTimeout(() => {
+                location.reload();
+              }, 5000); // 5秒后刷新页面
+            }
+          }, 5000);
         } else if (error.details === 'fragLoadError') {
           console.warn('Fragment loading error, retrying...');
         }
@@ -722,6 +731,12 @@
           const currentSrc = video.src || (hls && hls.url);
           if (currentSrc) {
             startVideo(currentSrc, $('videoTitle').innerText, !video.paused);
+          } else {
+            // 如果没有当前源，直接刷新页面
+            console.log('无法恢复播放器，正在刷新页面...');
+            setTimeout(() => {
+              location.reload();
+            }, 2000);
           }
           break;
       }
@@ -913,6 +928,9 @@
         video.setAttribute('playsinline', '');
         video.setAttribute('webkit-playsinline', '');
 
+        // 初始化播放时间监控
+        lastCurrentTime = video.currentTime || 0;
+
         // 尝试从本地存储恢复播放位置
         const history = JSON.parse(localStorage.getItem('video_history') || '{}');
         if (history[videoId]) {
@@ -931,6 +949,8 @@
           hls.on(Hls.Events.LEVEL_LOADED, () => {
             // 预缓存30秒内容
             preloadTimeRange(30);
+            // 更新监控时间
+            lastCurrentTime = video.currentTime || 0;
           });
 
           // 监听缓冲区更新事件，持续确保有足够的预加载内容
@@ -941,6 +961,8 @@
           // 对于原生视频，直接尝试预缓存
           video.addEventListener('loadeddata', () => {
             preloadTimeRange(30);
+            // 更新监控时间
+            lastCurrentTime = video.currentTime || 0;
           });
 
           // 监听时间更新，确保缓冲区充足
@@ -1159,6 +1181,8 @@
         if (video.buffered.length) {
           buf.style.width = (video.buffered.end(video.buffered.length - 1) / video.duration * 100) + "%";
         }
+        // 更新监控时间
+        lastCurrentTime = video.currentTime;
       } else {
         bar.style.width = "0%";
         buf.style.width = "0%";
@@ -1395,6 +1419,70 @@
         }
       });
     }
+
+    // 监控视频播放状态，检测长时间卡顿
+    let lastCurrentTime = 0;
+    let stallDetectionTimer = null;
+
+    function monitorVideoPlayback() {
+      if (!video || !video.duration || video.paused) {
+        // 如果视频未加载或已暂停，清除检测定时器
+        if (stallDetectionTimer) {
+          clearTimeout(stallDetectionTimer);
+          stallDetectionTimer = null;
+        }
+        return;
+      }
+
+      // 检查当前播放时间是否有变化
+      if (Math.abs(video.currentTime - lastCurrentTime) < 0.1) {
+        // 如果播放时间几乎没有变化，可能是卡顿
+        if (stallDetectionTimer) {
+          // 定时器已经存在，说明已经在监测卡顿
+          return;
+        }
+
+        // 开始检测卡顿
+        stallDetectionTimer = setTimeout(() => {
+          console.log('检测到视频长时间卡顿，正在刷新页面...');
+          // 卡顿超过设定时间，刷新页面
+          location.reload();
+        }, 10000); // 10秒后如果仍然卡顿则刷新页面
+      } else {
+        // 播放正常，更新上次播放时间并清除定时器
+        lastCurrentTime = video.currentTime;
+        if (stallDetectionTimer) {
+          clearTimeout(stallDetectionTimer);
+          stallDetectionTimer = null;
+        }
+      }
+    }
+
+    // 定期监控视频播放状态
+    setInterval(monitorVideoPlayback, 3000); // 每3秒检查一次
+
+    // 监听视频事件，更新播放状态监控
+    video.addEventListener('play', () => {
+      // 视频开始播放时，重置监控状态
+      lastCurrentTime = video.currentTime;
+      if (stallDetectionTimer) {
+        clearTimeout(stallDetectionTimer);
+        stallDetectionTimer = null;
+      }
+    });
+
+    video.addEventListener('pause', () => {
+      // 视频暂停时，停止监控
+      if (stallDetectionTimer) {
+        clearTimeout(stallDetectionTimer);
+        stallDetectionTimer = null;
+      }
+    });
+
+    video.addEventListener('seeked', () => {
+      // 拖拽播放进度后，更新最后播放时间
+      lastCurrentTime = video.currentTime;
+    });
   </script>
 </body>
 
