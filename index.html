@@ -970,26 +970,7 @@
         }
       }
 
-      // 拖拽后预加载函数
-      function preloadAfterSeek(seekTime) {
-        if (hls) {
-          // 拖拽后立即预加载更多内容
-          hls.nextLoadLevel = hls.nextLoadLevel || hls.currentLevel;
-        }
-        // 确保拖拽后有足够的缓冲区
-        setTimeout(() => {
-          if (video.buffered.length > 0) {
-            const bufferedEnd = video.buffered.end(video.buffered.length - 1);
-            const needPreload = seekTime + 30; // 预加载30秒内容
-            if (bufferedEnd < needPreload) {
-              // 触发加载更多内容
-              if (hls && hls.loadLevel) {
-                hls.loadLevel = hls.loadLevel; // 重新触发加载
-              }
-            }
-          }
-        }, 500); // 500ms后检查缓冲区
-      }
+
 
       // 生成视频的唯一ID用于存储播放历史
       function generateVideoId(url) {
@@ -1019,6 +1000,27 @@
     }
 
     let wrapRect = null;
+
+    // 拖拽后预加载函数
+    function preloadAfterSeek(seekTime) {
+      if (hls) {
+        // 拖拽后立即预加载更多内容
+        hls.nextLoadLevel = hls.nextLoadLevel || hls.currentLevel;
+      }
+      // 确保拖拽后有足够的缓冲区
+      setTimeout(() => {
+        if (video.buffered.length > 0) {
+          const bufferedEnd = video.buffered.end(video.buffered.length - 1);
+          const needPreload = seekTime + 30; // 预加载30秒内容
+          if (bufferedEnd < needPreload) {
+            // 触发加载更多内容
+            if (hls && hls.loadLevel) {
+              hls.loadLevel = hls.loadLevel; // 重新触发加载
+            }
+          }
+        }
+      }, 500); // 500ms后检查缓冲区
+    }
 
     const handleProgress = (e, isFinal = false) => {
       const clientX = e.touches ? e.touches[0].clientX : e.clientX;
