@@ -1,17 +1,13 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport"
-    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Media</title>
   <meta name="referrer" content="no-referrer-when-downgrade">
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1.6.15/dist/hls.min.js"></script>
-  <!-- 预加载关键资源 -->
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link rel="preconnect" href="https://apiv.nyanx.de" crossorigin>
-  <!-- 移动端优化 -->
   <meta name="format-detection" content="telephone=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
@@ -31,8 +27,7 @@
       padding: 0;
     }
 
-    html,
-    body {
+    html, body {
       height: 100dvh;
       width: 100%;
       background: var(--bg-dark);
@@ -43,7 +38,6 @@
       flex-direction: column;
     }
 
-    /* 搜索栏 */
     .search-container {
       flex: 0 0 auto;
       padding: calc(env(safe-area-inset-top, 0px) + 15px) 20px 10px;
@@ -99,15 +93,8 @@
     }
 
     @keyframes fadeIn {
-      from {
-        opacity: 0;
-        transform: translateY(-5px);
-      }
-
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
+      from { opacity: 0; transform: translateY(-5px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
     .result-item {
@@ -118,13 +105,8 @@
       transition: background 0.2s;
     }
 
-    .result-item:hover {
-      background: rgba(255, 255, 255, 0.05);
-    }
-
-    .result-item b {
-      color: var(--yt-red);
-    }
+    .result-item:hover { background: rgba(255, 255, 255, 0.05); }
+    .result-item b { color: var(--yt-red); }
 
     .main-player-area {
       flex: 1;
@@ -172,11 +154,9 @@
       width: 100%;
       height: 100%;
       object-fit: contain;
-      /* 移动端渲染优化 */
       transform: translateZ(0);
       -webkit-transform: translateZ(0);
       will-change: transform;
-      /* 硬件加速 */
       -webkit-backface-visibility: hidden;
       -webkit-perspective: 1000;
       backface-visibility: hidden;
@@ -202,8 +182,8 @@
       cursor: pointer;
       touch-action: none;
       position: relative;
-      padding: 10px 0; /* 增加垂直方向的触摸区域 */
-      margin: -10px 0; /* 抵消padding的影响，保持布局不变 */
+      padding: 10px 0;
+      margin: -10px 0;
     }
 
     .progress-container {
@@ -322,15 +302,9 @@
       border-radius: 2px;
     }
 
-    /* 移动端隐藏音量条 */
     @media (max-width: 768px) {
-      #volSlider {
-        display: none !important;
-      }
-
-      .btn-group {
-        gap: 8px;
-      }
+      #volSlider { display: none !important; }
+      .btn-group { gap: 8px; }
     }
 
     #timeBox {
@@ -372,9 +346,7 @@
     }
 
     @keyframes spin {
-      to {
-        transform: rotate(360deg);
-      }
+      to { transform: rotate(360deg); }
     }
 
     .speed-menu {
@@ -390,9 +362,7 @@
       overflow: hidden;
     }
 
-    .speed-menu.show {
-      display: flex;
-    }
+    .speed-menu.show { display: flex; }
 
     .speed-item {
       padding: 12px 25px;
@@ -407,30 +377,14 @@
       background: #2a2a2a;
     }
 
-    .hidden {
-      display: none !important;
-    }
-
-    /* 控制面板样式 */
-    .controls-panel {
-      width: 100%;
-      background: var(--panel-bg);
-      backdrop-filter: blur(25px);
-      -webkit-backdrop-filter: blur(25px);
-      padding: 16px;
-      margin-top: 15px;
-      border-radius: 20px;
-      border: 1px solid var(--border-light);
-    }
+    .hidden { display: none !important; }
   </style>
 </head>
-
 <body>
   <div class="search-container">
     <div class="search-box">
       <svg viewBox="0 0 24 24" width="20" height="20">
-        <path
-          d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
+        <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
       </svg>
       <input type="text" id="searchInput" placeholder="输入关键词搜索..." autocomplete="off">
     </div>
@@ -440,7 +394,6 @@
   <div class="main-player-area">
     <div class="player-stabilizer" id="playerNode">
       <div id="videoTitle">READY</div>
-
       <div class="video-wrapper" id="screen">
         <video id="video" playsinline webkit-playsinline></video>
         <div class="state-overlay">
@@ -454,7 +407,6 @@
           </div>
         </div>
       </div>
-
       <div class="controls-panel">
         <div class="progress-wrapper" id="progressWrap">
           <div class="progress-container">
@@ -462,7 +414,6 @@
             <div class="progress-bar" id="progressBar"></div>
           </div>
         </div>
-
         <div class="seek-row">
           <button class="seek-btn" onclick="window.seek(-600)">-10m</button>
           <button class="seek-btn" onclick="window.seek(-60)">-1m</button>
@@ -471,7 +422,6 @@
           <button class="seek-btn" onclick="window.seek(60)">+1m</button>
           <button class="seek-btn" onclick="window.seek(600)">+10m</button>
         </div>
-
         <div class="bottom-row">
           <div class="btn-group">
             <button class="btn" id="playBtn">
@@ -490,7 +440,6 @@
             </div>
             <span id="timeBox">0:00 / 0:00</span>
           </div>
-
           <div class="btn-group" style="position: relative;">
             <div class="speed-menu" id="speedMenu">
               <div class="speed-item" data-val="0.5">0.5x</div>
@@ -501,8 +450,7 @@
             <button class="btn" id="speedBtn">1.0x</button>
             <button class="btn" id="pipBtn">
               <svg viewBox="0 0 24 24">
-                <path
-                  d="M19 11h-8v6h8v-6zm4 8V4.98C23 3.88 22.1 3 21 3H3c-1.1 0-2 .88-2 1.98V19c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2zm-2 .02H3V4.97h18v14.05z" />
+                <path d="M19 11h-8v6h8v-6zm4 8V4.98C23 3.88 22.1 3 21 3H3c-1.1 0-2 .88-2 1.98V19c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2zm-2 .02H3V4.97h18v14.05z" />
               </svg>
             </button>
             <button class="btn" id="fullBtn">
@@ -526,9 +474,7 @@
     const API = "https://apiv.nyanx.de/";
     let wakeLock = null;
 
-    // 移动端网络状况检测
     function getNetworkQuality() {
-      // 使用 Network Information API 检测网络状况
       if ('connection' in navigator) {
         const connection = navigator.connection;
         const effectiveType = connection.effectiveType || 'unknown';
@@ -542,82 +488,61 @@
           return 'good';
         }
       }
-
-      // 如果不支持 Network Information API，返回默认值
       return 'unknown';
     }
 
-    // 根据网络状况调整HLS配置
     function getHlsConfigForNetwork(networkQuality) {
       const baseConfig = {
-        // 缓冲区优化 - 解决缓冲停滞问题
-        backBufferLength: 90, // 增加后缓冲区，减少卡顿
-        maxBufferLength: 30, // 适中缓冲长度，平衡流畅度和内存使用
-        maxMaxBufferLength: 60, // 最大缓冲区长度上限
-        // 加载策略 - 优化卡顿问题
-        liveSyncDurationCount: 3, // 减少直播同步片段数，降低延迟
-        maxLoadingDelay: 4, // 减少加载延迟
-        maxStarvationDelay: 3, // 减少饥饿延迟
-        // 自适应码率 - 针对卡顿问题优化
-        abrEwmaFastLive: 1.0, // 调整快速带宽估算时间常数，更平滑切换
-        abrEwmaSlowLive: 3.0, // 调整慢速带宽估算时间常数，避免频繁切换
-        abrEwmaDefaultEstimate: 5e5, // 默认带宽估算 (500 kbps)
-        abrBandWidthFactor: 0.95, // 带宽使用因子
-        abrBandWidthUpFactor: 0.7, // 上调带宽因子，更保守
-        // 性能优化
-        enableWorker: true, // 使用web worker解码，减少主线程阻塞
-        workerPath: null, // 使用默认worker路径
+        backBufferLength: 90,
+        maxBufferLength: 30,
+        maxMaxBufferLength: 60,
+        liveSyncDurationCount: 3,
+        maxLoadingDelay: 4,
+        maxStarvationDelay: 3,
+        abrEwmaFastLive: 1.0,
+        abrEwmaSlowLive: 3.0,
+        abrEwmaDefaultEstimate: 5e5,
+        abrBandWidthFactor: 0.95,
+        abrBandWidthUpFactor: 0.7,
+        enableWorker: true,
         enableWebWorker: true,
-        lowLatencyMode: false, // 关闭低延迟模式，提高稳定性
-        progressive: true, // 启用渐进式下载
-        // 关键帧对齐
+        lowLatencyMode: false,
+        progressive: true,
         forceKeyFrameOnDiscontinuity: true,
-        // 网络请求优化
-        maxBufferHole: 0.01, // 减少缓冲间隙，避免频繁调整
-        highBufferWatchdogPeriod: 2, // 减少高缓冲监控周期
-        nudgeMaxRetry: 3, // 减少同步重试次数
-        maxFragLookUpTolerance: 0.01, // 减少片段查找容差，提升拖拽体验
-        // 优化加载行为
-        startFragPrefetch: true, // 预加载第一个片段
-        testBandwidth: true, // 测试带宽以选择合适的质量
-        // 错误处理优化
-        nudgeOffset: 0.05, // 减少调整同步偏移，改善拖拽后播放
-        // 启用网络优化
+        maxBufferHole: 0.01,
+        highBufferWatchdogPeriod: 2,
+        nudgeMaxRetry: 3,
+        maxFragLookUpTolerance: 0.01,
+        startFragPrefetch: true,
+        testBandwidth: true,
+        nudgeOffset: 0.05,
         xhrSetup: function (xhr, url) {
-          // 允许跨域请求，添加移动端网络优化
           xhr.withCredentials = false;
-          // 设置请求超时时间
-          xhr.timeout = 20000; // 20秒超时，给更多时间加载
-          // 添加自定义请求头以匹配nginx配置
+          xhr.timeout = 20000;
           xhr.setRequestHeader('Accept', '*/*');
-          xhr.setRequestHeader('Accept-Encoding', 'identity'); // 避免压缩导致的兼容性问题
+          xhr.setRequestHeader('Accept-Encoding', 'identity');
         },
-        // 启用后处理以优化性能
-        fragLoadingTimeOut: 20000, // 片段加载超时
-        fragLoadingMaxRetry: 6, // 片段加载最大重试次数
-        fragLoadingMaxRetryTimeout: 60000, // 片段加载最大重试超时
-        levelLoadingTimeOut: 20000, // 级别加载超时
-        levelLoadingMaxRetry: 3, // 级别加载最大重试次数
-        levelLoadingMaxRetryTimeout: 60000, // 级别加载最大重试超时
-        // 其他优化参数
-        maxBufferSize: 60 * 1000 * 1000, // 最大缓冲区大小 60MB
-        appendErrorMaxRetry: 3, // 追加错误最大重试次数
-        enableSoftwareAES: true, // 启用软件AES解密
-        manifestLoadingTimeOut: 20000, // 清单加载超时
-        manifestLoadingMaxRetry: 3, // 清单加载最大重试次数
-        manifestLoadingMaxRetryTimeout: 60000, // 清单加载最大重试超时
-        // 优化拖拽体验的参数
-        capLevelOnFPSDrop: false, // 不因帧率下降降低画质
-        capLevelToPlayerSize: false, // 不因播放器尺寸限制画质
-        initialLiveManifestSize: 1, // 初始直播清单大小
-        enableCEA708Captions: false, // 禁用字幕以节省资源
-        enableEMSG: false, // 禁用消息事件
-        enableStats: false, // 禁用统计收集
-        timelineLifter: true, // 启用时间线提升
-        // 优化seek性能
-        maxSeekHole: 1, // 最大seek空洞
-        // 级别加载策略
-        levelLoadingLoadPolicy: { // 级别加载策略
+        fragLoadingTimeOut: 20000,
+        fragLoadingMaxRetry: 6,
+        fragLoadingMaxRetryTimeout: 60000,
+        levelLoadingTimeOut: 20000,
+        levelLoadingMaxRetry: 3,
+        levelLoadingMaxRetryTimeout: 60000,
+        maxBufferSize: 60 * 1000 * 1000,
+        appendErrorMaxRetry: 3,
+        enableSoftwareAES: true,
+        manifestLoadingTimeOut: 20000,
+        manifestLoadingMaxRetry: 3,
+        manifestLoadingMaxRetryTimeout: 60000,
+        capLevelOnFPSDrop: false,
+        capLevelToPlayerSize: false,
+        initialLiveManifestSize: 1,
+        enableCEA708Captions: false,
+        enableEMSG: false,
+        enableStats: false,
+        timelineLifter: true,
+        maxSeekHole: 1,
+        levelLoadingLoadPolicy: {
           default: {
             maxTimeToFirstByte: 10000,
             maxLoadTime: 20000,
@@ -625,7 +550,7 @@
             errorRetryDelay: 2000
           }
         },
-        fragLoadingLoadPolicy: { // 片段加载策略
+        fragLoadingLoadPolicy: {
           default: {
             maxTimeToFirstByte: 10000,
             maxLoadTime: 20000,
@@ -635,36 +560,32 @@
         }
       };
 
-      // 根据网络质量进一步调整配置
       switch (networkQuality) {
         case 'poor':
-          // 网络状况差时，更保守的配置
           baseConfig.maxBufferLength = 30;
           baseConfig.backBufferLength = 10;
-          baseConfig.abrBandWidthFactor = 0.5; // 更保守地选择质量
-          baseConfig.abrEwmaDefaultEstimate = 2e5; // 200 kbps
-          baseConfig.startFragPrefetch = false; // 不预加载第一个片段以节省流量
-          baseConfig.maxSeekHole = 5; // 增加seek空洞以适应较差网络
-          baseConfig.fragLoadingMaxRetry = 15; // 增加重试次数应对不稳定网络
+          baseConfig.abrBandWidthFactor = 0.5;
+          baseConfig.abrEwmaDefaultEstimate = 2e5;
+          baseConfig.startFragPrefetch = false;
+          baseConfig.maxSeekHole = 5;
+          baseConfig.fragLoadingMaxRetry = 15;
           baseConfig.levelLoadingMaxRetry = 15;
           break;
         case 'moderate':
-          // 中等网络状况
           baseConfig.maxBufferLength = 60;
           baseConfig.backBufferLength = 20;
           baseConfig.abrBandWidthFactor = 0.7;
-          baseConfig.abrEwmaDefaultEstimate = 5e5; // 500 kbps
+          baseConfig.abrEwmaDefaultEstimate = 5e5;
           baseConfig.startFragPrefetch = true;
           baseConfig.maxSeekHole = 3;
           baseConfig.fragLoadingMaxRetry = 10;
           baseConfig.levelLoadingMaxRetry = 10;
           break;
         case 'good':
-          // 良好网络状况
           baseConfig.maxBufferLength = 90;
           baseConfig.backBufferLength = 30;
           baseConfig.abrBandWidthFactor = 0.95;
-          baseConfig.abrEwmaDefaultEstimate = 1.5e6; // 1.5 Mbps
+          baseConfig.abrEwmaDefaultEstimate = 1.5e6;
           baseConfig.startFragPrefetch = true;
           baseConfig.maxSeekHole = 1;
           baseConfig.fragLoadingMaxRetry = 5;
@@ -675,7 +596,6 @@
       return baseConfig;
     }
 
-    // 改进的错误处理函数
     function handleHlsError(error) {
       console.error('HLS Error:', error);
       
@@ -683,33 +603,23 @@
         console.error('Error Details:', error.details);
       }
       
-      // 非致命错误的处理
       if (!error.fatal) {
-        // 对于缓冲停滞错误，增加一些缓冲配置
         if (error.details === 'bufferStalledError' || error.details === 'bufferNudgeOnStall') {
           console.warn('Handling buffer stall error...');
-          // 检查当前播放状态，如果长时间卡顿则刷新页面
           setTimeout(() => {
-            // 如果视频仍在播放但没有前进，则考虑刷新页面
             if (!video.paused && video.currentTime === lastCurrentTime) {
               console.log('长时间缓冲停滞，建议手动刷新页面...');
-              // 注释掉自动刷新功能，避免意外刷新
-              // setTimeout(() => {
-              //   location.reload();
-              // }, 5000); // 5秒后刷新页面
             }
           }, 5000);
         } else if (error.details === 'fragLoadError') {
           console.warn('Fragment loading error, retrying...');
         }
-        return; // 非致命错误直接返回
+        return;
       }
       
-      // 致命错误的处理
       switch(error.type) {
         case Hls.ErrorTypes.NETWORK_ERROR:
           console.warn('Fatal network error, try to recover');
-          // 增加重试逻辑
           setTimeout(() => {
             if (hls) {
               hls.startLoad();
@@ -718,7 +628,6 @@
           break;
         case Hls.ErrorTypes.MEDIA_ERROR:
           console.warn('Fatal media error, try to recover');
-          // 先销毁现有实例，然后重新创建
           setTimeout(() => {
             const currentSrc = video.src || (hls && hls.url);
             if (currentSrc) {
@@ -728,39 +637,25 @@
           break;
         default:
           console.error('Unrecoverable error, reload player');
-          // 尝试重新初始化播放器
           const currentSrc = video.src || (hls && hls.url);
           if (currentSrc) {
             startVideo(currentSrc, $('videoTitle').innerText, !video.paused);
           } else {
-            // 如果没有当前源，提示用户手动刷新页面
             console.log('无法恢复播放器，可手动刷新页面...');
-            // 注释掉自动刷新功能，避免意外刷新
-            // setTimeout(() => {
-            //   location.reload();
-            // }, 2000);
           }
           break;
       }
     }
 
-    // 申请屏幕唤醒锁
     async function requestWakeLock() {
       if ('wakeLock' in navigator) {
         try {
           wakeLock = await navigator.wakeLock.request('screen');
-          wakeLock.addEventListener('release', () => {
-
-          });
-        } catch (err) {
-          // 无法申请屏幕唤醒锁
-        }
-      } else {
-
+          wakeLock.addEventListener('release', () => {});
+        } catch (err) {}
       }
     }
 
-    // 释放屏幕唤醒锁
     function releaseWakeLock() {
       if (wakeLock) {
         wakeLock.release();
@@ -768,13 +663,10 @@
       }
     }
 
-    // 页面可见性变化时处理唤醒锁
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
-        // 页面隐藏时释放唤醒锁
         releaseWakeLock();
       } else if (!video.paused && isLoaded) {
-        // 页面可见且视频播放时重新申请唤醒锁
         requestWakeLock();
       }
     });
@@ -810,7 +702,6 @@
           url = `${API}?exclude=${usedCodes.join(',')}`;
         }
 
-        // 添加超时控制
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000);
 
@@ -865,12 +756,8 @@
         } else if (isSearch) {
           resultsList.innerHTML = '<div class="result-item">未找到相关视频</div>';
           resultsList.style.display = 'block';
-        } else {
-
         }
       } catch (e) {
-
-        // 详细的错误处理
         let errorMessage = "加载失败";
         if (e.name === 'AbortError') {
           errorMessage = "请求超时，请检查网络连接";
@@ -896,94 +783,75 @@
     function startVideo(m3u8, name, auto = true) {
       if (!m3u8) return;
       
-      // 销毁现有的HLS实例并清理相关事件监听器
       if (hls) {
-        hls.off(Hls.Events.ERROR);  // 移除错误事件监听器
-        hls.off(Hls.Events.MANIFEST_PARSED);  // 移除manifest解析事件监听器
-        hls.off(Hls.Events.BUFFER_APPENDED);  // 移除缓冲追加事件监听器
-        hls.off(Hls.Events.LEVEL_LOADED);  // 移除级别加载事件监听器
-        hls.destroy();  // 销毁HLS实例
+        hls.off(Hls.Events.ERROR);
+        hls.off(Hls.Events.MANIFEST_PARSED);
+        hls.off(Hls.Events.BUFFER_APPENDED);
+        hls.off(Hls.Events.LEVEL_LOADED);
+        hls.destroy();
         hls = null;
       }
       
-      // 清理video元素
       video.removeAttribute('src');
-      video.load(); // 重新加载以清除之前的缓冲
+      video.load();
       
       isLoaded = true;
       $('videoTitle').innerText = (name || "VIDEO").split('_')[0].toUpperCase();
       let finalUrl = m3u8.replace("https://surrit.com/", "/s1/");
 
-      // 创建基于URL的唯一ID用于存储播放历史
       const videoId = generateVideoId(m3u8);
 
-      // 获取当前网络状况并配置HLS参数
       const networkQuality = getNetworkQuality();
       const hlsConfig = getHlsConfigForNetwork(networkQuality);
 
       const setup = () => {
         video.volume = volSlider.value;
-        video.muted = true; // 确保每次加载视频时都是静音状态
+        video.muted = true;
         updateVolUI();
 
-        // 移动端性能优化
         video.setAttribute('playsinline', '');
         video.setAttribute('webkit-playsinline', '');
 
-        // 初始化播放时间监控
         lastCurrentTime = video.currentTime || 0;
 
-        // 尝试从本地存储恢复播放位置
         const history = JSON.parse(localStorage.getItem('video_history') || '{}');
         if (history[videoId]) {
-          // 检查视频是否接近结尾，如果是则从头开始播放
           const savedPosition = history[videoId];
           if (video.duration && savedPosition > video.duration - 10) {
-            video.currentTime = 0; // 如果距离结尾不到10秒，则从头开始
+            video.currentTime = 0;
           } else {
             video.currentTime = savedPosition;
           }
         }
 
-        // 监听元数据加载完成事件，此时可以获取准确的持续时间
         if (Hls.isSupported()) {
-          // 在HLS模式下，我们监听LEVEL_LOADED事件来确认已缓存足够内容
           hls.on(Hls.Events.LEVEL_LOADED, () => {
-            // 预缓存30秒内容
             preloadTimeRange(30);
-            // 更新监控时间
             lastCurrentTime = video.currentTime || 0;
           });
 
-          // 监听缓冲区更新事件，持续确保有足够的预加载内容
           hls.on(Hls.Events.BUFFER_APPENDED, () => {
             preloadTimeRange(30);
           });
         } else {
-          // 对于原生视频，直接尝试预缓存
           video.addEventListener('loadeddata', () => {
             preloadTimeRange(30);
-            // 更新监控时间
             lastCurrentTime = video.currentTime || 0;
           });
 
-          // 监听时间更新，确保缓冲区充足
           video.addEventListener('timeupdate', () => {
             preloadTimeRange(30);
           });
         }
 
         if (auto) {
-          // 移动端优化：先静音播放以绕过自动播放限制
           video.muted = true;
           updateVolUI();
           const playPromise = video.play();
           if (playPromise !== undefined) {
             playPromise
               .then(() => {
-                // 播放成功
                 $('centerPlayIcon').classList.add('hidden');
-                // 如果用户之前设置了非静音，则恢复音量
                 setTimeout(() => {
                   if (!video.muted && video.volume > 0) {
                     video.muted = false;
@@ -991,13 +859,11 @@
                 }, 1000);
               })
               .catch(error => {
-                // 如果自动播放失败，尝试先静音再播放
                 video.muted = true;
                 updateVolUI();
                 video.play().then(() => {
                   $('centerPlayIcon').classList.add('hidden');
                 }).catch(() => {
-                  // 如果仍然失败，显示播放按钮
                   $('centerPlayIcon').classList.remove('hidden');
                 });
               });
@@ -1005,37 +871,23 @@
         }
       };
 
-
-      // 预缓存指定时间段的函数
       function preloadTimeRange(secondsToPreload) {
-        // 这个函数用于确保指定秒数的内容已被缓冲
-        if (video.readyState >= 1 && video.buffered.length > 0) { // HAVE_METADATA及以上
+        if (video.readyState >= 1 && video.buffered.length > 0) {
           try {
             const bufferedEnd = video.buffered.end(video.buffered.length - 1);
             const targetTime = Math.min(video.duration || Infinity, video.currentTime + secondsToPreload);
 
-            // 如果缓冲区未达到目标时间，则继续加载
-            if (bufferedEnd < targetTime) {
-              // HLS.js会自动管理缓冲区，这里主要是监控和记录
-
-            }
-          } catch (e) {
-            // 处理可能的错误，例如在视频加载初期buffered.end可能不可用
-
-          }
+            if (bufferedEnd < targetTime) {}
+          } catch (e) {}
         }
       }
 
-
-
-      // 生成视频的唯一ID用于存储播放历史
       function generateVideoId(url) {
-        // 简单的哈希函数生成唯一ID
         let hash = 0;
         for (let i = 0; i < url.length; i++) {
           const char = url.charCodeAt(i);
           hash = ((hash << 5) - hash) + char;
-          hash |= 0; // 转换为32位整数
+          hash |= 0;
         }
         return url.length + '_' + Math.abs(hash).toString(36);
       }
@@ -1057,27 +909,22 @@
 
     let wrapRect = null;
 
-    // 拖拽后预加载函数
     function preloadAfterSeek(seekTime) {
-      // 确保拖拽后有足够的缓冲区
       setTimeout(() => {
         if (video.buffered.length > 0) {
           const bufferedEnd = video.buffered.end(video.buffered.length - 1);
-          const needPreload = Math.min(video.duration || Infinity, seekTime + 30); // 预加载30秒内容，但不超过视频总长度
+          const needPreload = Math.min(video.duration || Infinity, seekTime + 30);
           if (bufferedEnd < needPreload) {
-            // 触发加载更多内容
             if (hls) {
-              // 在HLS模式下，通过设置currentTime来触发加载更多内容
-              video.currentTime = video.currentTime; // 强制更新播放位置
+              video.currentTime = video.currentTime;
             }
           }
         }
-      }, 500); // 500ms后检查缓冲区
+      }, 500);
     }
 
     const handleProgress = (e, isFinal = false) => {
       if (!wrapRect) wrapRect = wrap.getBoundingClientRect();
-      // 处理触摸事件和鼠标事件
       let clientX;
       if (e.touches && e.touches.length > 0) {
         clientX = e.touches[0].clientX;
@@ -1090,33 +937,25 @@
       const newTime = p * video.duration;
       
       if (isFinal) {
-        // 拖拽结束时更新时间并触发预加载
         if (!isNaN(newTime) && video.duration > 0) {
           video.currentTime = newTime;
         }
         isDragging = false;
         
-        // 拖拽完成后立即开始预加载后续内容
-        // 对于HLS和原生视频，设置currentTime就足够了，HLS.js会自动处理
-        
-        // 调用拖拽后预加载函数
         preloadAfterSeek(newTime);
       } else if (isDragging) {
-        // 拖拽过程中仅更新UI进度条和时间显示
         bar.style.width = (p * 100) + "%";
         $('timeBox').innerText = `${fmt(newTime)} / ${fmt(video.duration)}`;
       }
     };
 
-    // 拖拽优化：分阶段处理，避免频繁seek
     wrap.onmousedown = (e) => {
-      e.preventDefault(); // 防止默认行为干扰
-      if (!video.duration) return; // 没有视频时长则不处理
+      e.preventDefault();
+      if (!video.duration) return;
       isDragging = true;
       wrapRect = wrap.getBoundingClientRect();
       handleProgress(e);
       
-      // 拖拽开始时暂停自动更新进度条
       video.removeEventListener('timeupdate', updateProgressBar);
     };
 
@@ -1129,12 +968,10 @@
     window.onmouseup = (e) => {
       if (isDragging) {
         handleProgress(e, true);
-        // 拖拽结束后恢复进度条更新
         video.addEventListener('timeupdate', updateProgressBar);
       }
     };
 
-    // 添加全局触摸事件处理，防止页面滚动影响进度条拖动
     document.addEventListener('touchmove', function(e) {
       if (isDragging) {
         e.preventDefault();
@@ -1143,12 +980,11 @@
 
     wrap.ontouchstart = (e) => {
       e.preventDefault();
-      if (!video.duration) return; // 没有视频时长则不处理
+      if (!video.duration) return;
       isDragging = true;
       wrapRect = wrap.getBoundingClientRect();
       handleProgress(e);
       
-      // 拖拽开始时暂停自动更新进度条
       video.removeEventListener('timeupdate', updateProgressBar);
     };
 
@@ -1162,28 +998,23 @@
     wrap.ontouchend = (e) => {
       if (isDragging) {
         handleProgress(e, true);
-        // 拖拽结束后恢复进度条更新
         video.addEventListener('timeupdate', updateProgressBar);
       }
     };
     
-    // 添加触摸取消事件处理，防止意外中断
     wrap.ontouchcancel = (e) => {
       if (isDragging) {
         handleProgress(e, true);
-        // 拖拽结束后恢复进度条更新
         video.addEventListener('timeupdate', updateProgressBar);
       }
     };
 
-    // 分离的进度条更新函数，用于拖拽时暂停
     function updateProgressBar() {
       if (video.duration && video.duration > 0) {
         bar.style.width = (video.currentTime / video.duration * 100) + "%";
         if (video.buffered.length) {
           buf.style.width = (video.buffered.end(video.buffered.length - 1) / video.duration * 100) + "%";
         }
-        // 更新监控时间
         lastCurrentTime = video.currentTime;
       } else {
         bar.style.width = "0%";
@@ -1193,35 +1024,29 @@
     }
 
     video.ontimeupdate = () => {
-      // 保存播放历史
       const currentVideo = localStorage.getItem('current_video');
       if (currentVideo && !isDragging) {
         try {
           const data = JSON.parse(currentVideo);
           const history = JSON.parse(localStorage.getItem('video_history') || '{}');
-          // 使用视频ID作为键，而不是原始URL
           history[data.videoId] = video.currentTime;
 
-          // 如果视频播放完毕（接近结尾），则从历史记录中移除
           if (video.duration && video.currentTime > video.duration - 5) {
-            delete history[data.videoId]; // 播放完毕后清除历史记录
+            delete history[data.videoId];
           }
 
           localStorage.setItem('video_history', JSON.stringify(history));
-        } catch (e) {
-
-        }
+        } catch (e) {}
       }
     };
 
     video.onplaying = () => {
       $('pIcon').innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
       $('centerPlayIcon').classList.add('hidden');
-      // 视频播放时申请屏幕唤醒锁
       requestWakeLock();
       const up = () => {
         if (!video.paused && !isDragging) {
-          updateProgressBar(); // 使用分离的进度条更新函数
+          updateProgressBar();
           requestAnimationFrame(up);
         }
       };
@@ -1231,20 +1056,17 @@
     video.onpause = () => {
       if (isLoaded) $('centerPlayIcon').classList.remove('hidden');
       $('pIcon').innerHTML = '<path d="M8 5v14l11-7z"/>';
-      // 视频暂停时释放屏幕唤醒锁
       releaseWakeLock();
     };
 
     video.onended = () => {
-      // 视频结束时释放屏幕唤醒锁
       releaseWakeLock();
 
-      // 从播放历史中清除当前视频的记录
       const currentVideo = localStorage.getItem('current_video');
       if (currentVideo) {
         const data = JSON.parse(currentVideo);
         const history = JSON.parse(localStorage.getItem('video_history') || '{}');
-        delete history[data.videoId]; // 播放结束后清除历史记录
+        delete history[data.videoId];
         localStorage.setItem('video_history', JSON.stringify(history));
       }
 
@@ -1258,18 +1080,14 @@
     $('pipBtn').onclick = async () => {
       try {
         await video.requestPictureInPicture();
-      } catch (error) {
-
-      }
+      } catch (error) {}
     };
 
-    // 修复 iOS 全屏
     $('fullBtn').onclick = () => {
       const node = $('playerNode');
       if (document.fullscreenElement) {
         document.exitFullscreen();
       } else if (video.webkitEnterFullscreen) {
-        // iOS iPhone 专用
         video.webkitEnterFullscreen();
       } else if (node.requestFullscreen) {
         node.requestFullscreen();
@@ -1278,21 +1096,17 @@
       }
     };
 
-    // 检测是否为 iOS 设备
     function isIOSDevice() {
       return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); // 支持 iPadOS
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     }
 
-    // 全屏状态变化事件监听
     document.addEventListener('fullscreenchange', () => {
       const playerNode = $('playerNode');
 
       if (document.fullscreenElement) {
-        // 进入全屏
         playerNode.classList.add('fullscreen');
       } else {
-        // 退出全屏
         playerNode.classList.remove('fullscreen');
       }
     });
@@ -1331,27 +1145,18 @@
     };
     window.seek = s => video.currentTime += s;
 
-    // 页面可见性变化事件监听 - 当用户切换标签页或最小化浏览器时暂停播放
     document.addEventListener('visibilitychange', function () {
       if (document.hidden) {
-        // 页面变为不可见（切换到其他标签页、最小化或进入后台）
         if (!video.paused) {
           video.pause();
         }
       }
     });
 
-    // 页面失焦时暂停播放
     window.addEventListener('blur', function () {
       if (!video.paused) {
         video.pause();
       }
-    });
-
-    // 页面获得焦点时可以选择恢复播放（可选功能）
-    window.addEventListener('focus', function () {
-      // 可根据需求决定是否自动恢复播放
-      // video.play();
     });
 
     window.onclick = (e) => {
@@ -1359,31 +1164,13 @@
       $('speedMenu').classList.remove('show');
     };
 
-    // 自动刷新功能 - 长时间无操作后刷新页面 - 已禁用此功能
-    // let autoRefreshTimer = null;
-    // const AUTO_REFRESH_TIME = 30 * 60 * 1000; // 30分钟无操作后刷新
-
-    // 由于禁用了自动刷新功能，不需要resetAutoRefreshTimer函数
-    // function resetAutoRefreshTimer() {
-    //   // 空函数或保留原有逻辑但不执行刷新
-    // }
-
-    // 由于禁用了自动刷新功能，不需要监听用户活动事件
-    // ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'touchmove'].forEach(eventType => {
-    //   document.addEventListener(eventType, resetAutoRefreshTimer, true);
-    // });
-
-    // 由于禁用了自动刷新功能，不需要初始化自动刷新计时器
-    // resetAutoRefreshTimer();
-
     window.onload = () => {
-      // 为iOS设备添加特定CSS类
       if (isIOSDevice()) {
         document.body.classList.add('ios-device');
       }
 
       video.volume = 0.5;
-      video.muted = true; // 初始状态静音
+      video.muted = true;
       updateVolUI();
       const saved = localStorage.getItem('current_video');
       if (saved) {
@@ -1393,37 +1180,29 @@
         playNext();
       }
       
-      // 添加播放性能优化
       optimizeVideoPerformance();
     };
 
-    // 优化视频播放性能的函数
     function optimizeVideoPerformance() {
-      // 为视频元素添加额外的性能优化属性
       video.setAttribute('preload', 'metadata');
       video.setAttribute('x-webkit-airplay', 'deny');
       
-      // 优化渲染性能
       video.style.transform = 'translateZ(0)';
       video.style.willChange = 'transform';
       
-      // 监听网络状态变化，动态调整HLS配置
       window.addEventListener('online', function() {
         console.log('网络连接已恢复，重新优化播放参数');
         if (hls) {
-          // 网络恢复时重新调整配置
           hls.recoverMediaError();
         }
       });
     }
 
-    // 监控视频播放状态，检测长时间卡顿
     let lastCurrentTime = 0;
     let stallDetectionTimer = null;
 
     function monitorVideoPlayback() {
       if (!video || !video.duration || video.paused) {
-        // 如果视频未加载或已暂停，清除检测定时器
         if (stallDetectionTimer) {
           clearTimeout(stallDetectionTimer);
           stallDetectionTimer = null;
@@ -1431,23 +1210,15 @@
         return;
       }
 
-      // 检查当前播放时间是否有变化
       if (Math.abs(video.currentTime - lastCurrentTime) < 0.1) {
-        // 如果播放时间几乎没有变化，可能是卡顿
         if (stallDetectionTimer) {
-          // 定时器已经存在，说明已经在监测卡顿
           return;
         }
 
-        // 开始检测卡顿
         stallDetectionTimer = setTimeout(() => {
           console.log('检测到视频长时间卡顿，建议手动刷新页面...');
-          // 注释掉自动刷新功能，避免意外刷新
-          // 卡顿超过设定时间，刷新页面
-          // location.reload();
-        }, 10000); // 10秒后如果仍然卡顿则刷新页面
+        }, 10000);
       } else {
-        // 播放正常，更新上次播放时间并清除定时器
         lastCurrentTime = video.currentTime;
         if (stallDetectionTimer) {
           clearTimeout(stallDetectionTimer);
@@ -1456,12 +1227,9 @@
       }
     }
 
-    // 定期监控视频播放状态
-    setInterval(monitorVideoPlayback, 3000); // 每3秒检查一次
+    setInterval(monitorVideoPlayback, 3000);
 
-    // 监听视频事件，更新播放状态监控
     video.addEventListener('play', () => {
-      // 视频开始播放时，重置监控状态
       lastCurrentTime = video.currentTime;
       if (stallDetectionTimer) {
         clearTimeout(stallDetectionTimer);
@@ -1470,7 +1238,6 @@
     });
 
     video.addEventListener('pause', () => {
-      // 视频暂停时，停止监控
       if (stallDetectionTimer) {
         clearTimeout(stallDetectionTimer);
         stallDetectionTimer = null;
@@ -1478,10 +1245,8 @@
     });
 
     video.addEventListener('seeked', () => {
-      // 拖拽播放进度后，更新最后播放时间
       lastCurrentTime = video.currentTime;
     });
   </script>
 </body>
-
 </html>
