@@ -585,6 +585,9 @@
           xhr.withCredentials = false;
           // 设置请求超时时间
           xhr.timeout = 30000; // 30秒超时，给更多时间加载
+          // 添加自定义请求头以匹配nginx配置
+          xhr.setRequestHeader('Accept', '*/*');
+          xhr.setRequestHeader('Accept-Encoding', 'identity'); // 避免压缩导致的兼容性问题
         },
         // 启用后处理以优化性能
         fragLoadingTimeOut: 30000, // 片段加载超时
@@ -639,6 +642,8 @@
           baseConfig.abrEwmaDefaultEstimate = 2e5; // 200 kbps
           baseConfig.startFragPrefetch = false; // 不预加载第一个片段以节省流量
           baseConfig.maxSeekHole = 5; // 增加seek空洞以适应较差网络
+          baseConfig.fragLoadingMaxRetry = 15; // 增加重试次数应对不稳定网络
+          baseConfig.levelLoadingMaxRetry = 15;
           break;
         case 'moderate':
           // 中等网络状况
@@ -648,6 +653,8 @@
           baseConfig.abrEwmaDefaultEstimate = 5e5; // 500 kbps
           baseConfig.startFragPrefetch = true;
           baseConfig.maxSeekHole = 3;
+          baseConfig.fragLoadingMaxRetry = 10;
+          baseConfig.levelLoadingMaxRetry = 10;
           break;
         case 'good':
           // 良好网络状况
@@ -657,10 +664,50 @@
           baseConfig.abrEwmaDefaultEstimate = 1.5e6; // 1.5 Mbps
           baseConfig.startFragPrefetch = true;
           baseConfig.maxSeekHole = 1;
+          baseConfig.fragLoadingMaxRetry = 5;
+          baseConfig.levelLoadingMaxRetry = 5;
           break;
       }
 
       return baseConfig;
+    }
+
+    // 错误处理函数
+    function handleHlsError(error) {
+      console.error('HLS Error:', error);
+      
+      if (error.details) {
+        console.error('Error Details:', error.details);
+      }
+      
+      if (error.fatal) {
+        switch(error.type) {
+          case Hls.ErrorTypes.NETWORK_ERROR:
+            console.warn('Fatal network error, try to recover');
+            setTimeout(() => {
+              if (hls) {
+                hls.startLoad();
+              }
+            }, 2000);
+            break;
+          case Hls.ErrorTypes.MEDIA_ERROR:
+            console.warn('Fatal media error, try to recover');
+            setTimeout(() => {
+              if (hls) {
+                hls.recoverMediaError();
+              }
+            }, 2000);
+            break;
+          default:
+            console.error('Unrecoverable error, reload player');
+            // 尝试重新初始化播放器
+            const currentSrc = video.src || (hls && hls.url);
+            if (currentSrc) {
+              startVideo(currentSrc, $('videoTitle').innerText, !video.paused);
+            }
+            break;
+        }
+      }
     }
 
     // 申请屏幕唤醒锁
@@ -961,6 +1008,9 @@
         hls.loadSource(finalUrl);
         hls.attachMedia(video);
         hls.on(Hls.Events.MANIFEST_PARSED, setup);
+        hls.on(Hls.Events.ERROR, function (event, data) {
+          handleHlsError(data);
+        });
       } else {
         video.src = finalUrl;
         video.onloadedmetadata = setup;
