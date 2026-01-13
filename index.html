@@ -548,19 +548,19 @@
     function getHlsConfigForNetwork(networkQuality) {
       const baseConfig = {
         // 缓冲区优化 - 优化卡顿问题
-        backBufferLength: 60, // 增加后缓冲区，减少卡顿
-        maxBufferLength: 90, // 增加最大缓冲区长度，提高流畅度
-        maxMaxBufferLength: 120, // 最大缓冲区长度上限
+        backBufferLength: 90, // 增加后缓冲区，减少卡顿
+        maxBufferLength: 120, // 增加最大缓冲区长度，提高流畅度
+        maxMaxBufferLength: 150, // 最大缓冲区长度上限
         // 加载策略 - 优化卡顿问题
-        liveSyncDurationCount: 6, // 增加直播同步片段数，提高稳定性
-        maxLoadingDelay: 4, // 增加加载延迟，避免频繁加载
-        maxStarvationDelay: 4, // 增加饥饿延迟，减少卡顿
+        liveSyncDurationCount: 8, // 增加直播同步片段数，提高稳定性
+        maxLoadingDelay: 6, // 增加加载延迟，避免频繁加载
+        maxStarvationDelay: 6, // 增加饥饿延迟，减少卡顿
         // 自适应码率 - 针对卡顿问题优化
-        abrEwmaFastLive: 3.0, // 调整快速带宽估算时间常数，更平滑切换
-        abrEwmaSlowLive: 8.0, // 调整慢速带宽估算时间常数，避免频繁切换
+        abrEwmaFastLive: 4.0, // 调整快速带宽估算时间常数，更平滑切换
+        abrEwmaSlowLive: 10.0, // 调整慢速带宽估算时间常数，避免频繁切换
         abrEwmaDefaultEstimate: 5e5, // 默认带宽估算 (500 kbps)
-        abrBandWidthFactor: 0.85, // 带宽使用因子
-        abrBandWidthUpFactor: 0.7, // 上调带宽因子，更保守
+        abrBandWidthFactor: 0.9, // 带宽使用因子
+        abrBandWidthUpFactor: 0.8, // 上调带宽因子，更保守
         // 性能优化
         enableWorker: true, // 使用web worker解码，减少主线程阻塞
         workerPath: null, // 使用默认worker路径
@@ -570,50 +570,61 @@
         // 关键帧对齐
         forceKeyFrameOnDiscontinuity: true,
         // 网络请求优化
-        maxBufferHole: 0.01, // 减小缓冲间隙，提高连续性
-        highBufferWatchdogPeriod: 2, // 增加高缓冲监控周期
-        nudgeMaxRetry: 3, // 增加同步重试次数
-        maxFragLookUpTolerance: 0.01, // 减小片段查找容差
+        maxBufferHole: 0.05, // 适当增加缓冲间隙，避免频繁调整
+        highBufferWatchdogPeriod: 3, // 增加高缓冲监控周期
+        nudgeMaxRetry: 5, // 增加同步重试次数
+        maxFragLookUpTolerance: 0.05, // 增加片段查找容差，提升拖拽体验
         // 优化加载行为
         startFragPrefetch: true, // 预加载第一个片段
         testBandwidth: true, // 测试带宽以选择合适的质量
         // 错误处理优化
-        nudgeOffset: 0.05, // 减小调整同步偏移
+        nudgeOffset: 0.1, // 增加调整同步偏移，改善拖拽后播放
         // 启用网络优化
         xhrSetup: function (xhr, url) {
           // 允许跨域请求，添加移动端网络优化
           xhr.withCredentials = false;
           // 设置请求超时时间
-          xhr.timeout = 20000; // 20秒超时，给更多时间加载
+          xhr.timeout = 30000; // 30秒超时，给更多时间加载
         },
         // 启用后处理以优化性能
-        fragLoadingTimeOut: 20000, // 片段加载超时
-        fragLoadingMaxRetry: 6, // 片段加载最大重试次数
-        fragLoadingMaxRetryTimeout: 60000, // 片段加载最大重试超时
-        levelLoadingTimeOut: 20000, // 级别加载超时
-        levelLoadingMaxRetry: 6, // 级别加载最大重试次数
-        levelLoadingMaxRetryTimeout: 60000, // 级别加载最大重试超时
+        fragLoadingTimeOut: 30000, // 片段加载超时
+        fragLoadingMaxRetry: 10, // 片段加载最大重试次数
+        fragLoadingMaxRetryTimeout: 90000, // 片段加载最大重试超时
+        levelLoadingTimeOut: 30000, // 级别加载超时
+        levelLoadingMaxRetry: 10, // 级别加载最大重试次数
+        levelLoadingMaxRetryTimeout: 90000, // 级别加载最大重试超时
         // 其他优化参数
-        maxBufferSize: 60 * 1000 * 1000, // 最大缓冲区大小 60MB
-        appendErrorMaxRetry: 3, // 追加错误最大重试次数
+        maxBufferSize: 100 * 1000 * 1000, // 最大缓冲区大小 100MB
+        appendErrorMaxRetry: 5, // 追加错误最大重试次数
         enableSoftwareAES: true, // 启用软件AES解密
-        manifestLoadingTimeOut: 20000, // 清单加载超时
-        manifestLoadingMaxRetry: 3, // 清单加载最大重试次数
-        manifestLoadingMaxRetryTimeout: 64000, // 清单加载最大重试超时
+        manifestLoadingTimeOut: 30000, // 清单加载超时
+        manifestLoadingMaxRetry: 5, // 清单加载最大重试次数
+        manifestLoadingMaxRetryTimeout: 90000, // 清单加载最大重试超时
+        // 优化拖拽体验的参数
+        capLevelOnFPSDrop: false, // 不因帧率下降降低画质
+        capLevelToPlayerSize: false, // 不因播放器尺寸限制画质
+        initialLiveManifestSize: 1, // 初始直播清单大小
+        enableCEA708Captions: false, // 禁用字幕以节省资源
+        enableEMSG: false, // 禁用消息事件
+        enableStats: false, // 禁用统计收集
+        timelineLifter: true, // 启用时间线提升
+        // 优化seek性能
+        maxSeekHole: 2, // 最大seek空洞
+        // 级别加载策略
         levelLoadingLoadPolicy: { // 级别加载策略
           default: {
-            maxTimeToFirstByte: 10000,
-            maxLoadTime: 20000,
-            timeoutRetryDelay: 1000,
-            errorRetryDelay: 2000
+            maxTimeToFirstByte: 15000,
+            maxLoadTime: 30000,
+            timeoutRetryDelay: 2000,
+            errorRetryDelay: 3000
           }
         },
         fragLoadingLoadPolicy: { // 片段加载策略
           default: {
-            maxTimeToFirstByte: 10000,
-            maxLoadTime: 20000,
-            timeoutRetryDelay: 1000,
-            errorRetryDelay: 2000
+            maxTimeToFirstByte: 15000,
+            maxLoadTime: 30000,
+            timeoutRetryDelay: 2000,
+            errorRetryDelay: 3000
           }
         }
       };
@@ -622,27 +633,30 @@
       switch (networkQuality) {
         case 'poor':
           // 网络状况差时，更保守的配置
-          baseConfig.maxBufferLength = 20;
-          baseConfig.backBufferLength = 5;
-          baseConfig.abrBandWidthFactor = 0.6; // 更保守地选择质量
-          baseConfig.abrEwmaDefaultEstimate = 3e5; // 300 kbps
+          baseConfig.maxBufferLength = 30;
+          baseConfig.backBufferLength = 10;
+          baseConfig.abrBandWidthFactor = 0.5; // 更保守地选择质量
+          baseConfig.abrEwmaDefaultEstimate = 2e5; // 200 kbps
           baseConfig.startFragPrefetch = false; // 不预加载第一个片段以节省流量
+          baseConfig.maxSeekHole = 5; // 增加seek空洞以适应较差网络
           break;
         case 'moderate':
           // 中等网络状况
-          baseConfig.maxBufferLength = 30;
-          baseConfig.backBufferLength = 10;
+          baseConfig.maxBufferLength = 60;
+          baseConfig.backBufferLength = 20;
           baseConfig.abrBandWidthFactor = 0.7;
           baseConfig.abrEwmaDefaultEstimate = 5e5; // 500 kbps
           baseConfig.startFragPrefetch = true;
+          baseConfig.maxSeekHole = 3;
           break;
         case 'good':
           // 良好网络状况
-          baseConfig.maxBufferLength = 45;
-          baseConfig.backBufferLength = 15;
-          baseConfig.abrBandWidthFactor = 0.9;
-          baseConfig.abrEwmaDefaultEstimate = 1e6; // 1 Mbps
+          baseConfig.maxBufferLength = 90;
+          baseConfig.backBufferLength = 30;
+          baseConfig.abrBandWidthFactor = 0.95;
+          baseConfig.abrEwmaDefaultEstimate = 1.5e6; // 1.5 Mbps
           baseConfig.startFragPrefetch = true;
+          baseConfig.maxSeekHole = 1;
           break;
       }
 
@@ -909,6 +923,27 @@
         }
       }
 
+      // 拖拽后预加载函数
+      function preloadAfterSeek(seekTime) {
+        if (hls) {
+          // 拖拽后立即预加载更多内容
+          hls.nextLoadLevel = hls.nextLoadLevel || hls.currentLevel;
+        }
+        // 确保拖拽后有足够的缓冲区
+        setTimeout(() => {
+          if (video.buffered.length > 0) {
+            const bufferedEnd = video.buffered.end(video.buffered.length - 1);
+            const needPreload = seekTime + 30; // 预加载30秒内容
+            if (bufferedEnd < needPreload) {
+              // 触发加载更多内容
+              if (hls && hls.loadLevel) {
+                hls.loadLevel = hls.loadLevel; // 重新触发加载
+              }
+            }
+          }
+        }, 500); // 500ms后检查缓冲区
+      }
+
       // 生成视频的唯一ID用于存储播放历史
       function generateVideoId(url) {
         // 简单的哈希函数生成唯一ID
@@ -939,30 +974,62 @@
       const clientX = e.touches ? e.touches[0].clientX : e.clientX;
       const p = Math.max(0, Math.min(1, (clientX - wrapRect.left) / wrapRect.width));
       bar.style.width = (p * 100) + "%";
-      if (isFinal) video.currentTime = p * video.duration;
+      
+      if (isFinal) {
+        // 拖拽结束时更新时间并触发预加载
+        const seekTime = p * video.duration;
+        video.currentTime = seekTime;
+        isDragging = false;
+        
+        // 拖拽完成后立即开始预加载后续内容
+        if (hls && hls.startLoad) {
+          // 重新开始加载以确保缓冲区正确
+          hls.startLoad(seekTime);
+        }
+        
+        // 调用拖拽后预加载函数
+        preloadAfterSeek(seekTime);
+      } else if (isDragging) {
+        // 拖拽过程中仅更新UI，不改变播放时间
+        // 显示预览时间但不实际跳转
+        const previewTime = p * video.duration;
+        $('timeBox').innerText = `${fmt(previewTime)} / ${fmt(video.duration)}`;
+      }
     };
 
+    // 拖拽优化：分阶段处理，避免频繁seek
     wrap.onmousedown = (e) => {
+      e.preventDefault(); // 防止默认行为干扰
       isDragging = true;
       wrapRect = wrap.getBoundingClientRect();
       handleProgress(e);
+      
+      // 拖拽开始时暂停自动更新进度条
+      video.removeEventListener('timeupdate', updateProgressBar);
     };
 
     window.onmousemove = (e) => {
-      if (isDragging) handleProgress(e);
+      if (isDragging) {
+        handleProgress(e);
+      }
     };
 
     window.onmouseup = (e) => {
       if (isDragging) {
-        isDragging = false;
         handleProgress(e, true);
+        // 拖拽结束后恢复进度条更新
+        video.addEventListener('timeupdate', updateProgressBar);
       }
     };
 
     wrap.ontouchstart = (e) => {
+      e.preventDefault();
       isDragging = true;
       wrapRect = wrap.getBoundingClientRect();
       handleProgress(e);
+      
+      // 拖拽开始时暂停自动更新进度条
+      video.removeEventListener('timeupdate', updateProgressBar);
     };
 
     wrap.ontouchmove = (e) => {
@@ -974,10 +1041,25 @@
 
     wrap.ontouchend = (e) => {
       if (isDragging) {
-        isDragging = false;
         handleProgress(e, true);
+        // 拖拽结束后恢复进度条更新
+        video.addEventListener('timeupdate', updateProgressBar);
       }
     };
+
+    // 分离的进度条更新函数，用于拖拽时暂停
+    function updateProgressBar() {
+      if (video.duration && video.duration > 0) {
+        bar.style.width = (video.currentTime / video.duration * 100) + "%";
+        if (video.buffered.length) {
+          buf.style.width = (video.buffered.end(video.buffered.length - 1) / video.duration * 100) + "%";
+        }
+      } else {
+        bar.style.width = "0%";
+        buf.style.width = "0%";
+      }
+      $('timeBox').innerText = `${fmt(video.currentTime)} / ${fmt(video.duration)}`;
+    }
 
     video.ontimeupdate = () => {
       // 保存播放历史
@@ -1008,14 +1090,7 @@
       requestWakeLock();
       const up = () => {
         if (!video.paused && !isDragging) {
-          if (video.duration && video.duration > 0) {
-            bar.style.width = (video.currentTime / video.duration * 100) + "%";
-            if (video.buffered.length) buf.style.width = (video.buffered.end(video.buffered.length - 1) / video.duration * 100) + "%";
-          } else {
-            bar.style.width = "0%";
-            buf.style.width = "0%";
-          }
-          $('timeBox').innerText = `${fmt(video.currentTime)} / ${fmt(video.duration)}`;
+          updateProgressBar(); // 使用分离的进度条更新函数
           requestAnimationFrame(up);
         }
       };
@@ -1191,7 +1266,30 @@
       } else {
         playNext();
       }
+      
+      // 添加播放性能优化
+      optimizeVideoPerformance();
     };
+
+    // 优化视频播放性能的函数
+    function optimizeVideoPerformance() {
+      // 为视频元素添加额外的性能优化属性
+      video.setAttribute('preload', 'metadata');
+      video.setAttribute('x-webkit-airplay', 'deny');
+      
+      // 优化渲染性能
+      video.style.transform = 'translateZ(0)';
+      video.style.willChange = 'transform';
+      
+      // 监听网络状态变化，动态调整HLS配置
+      window.addEventListener('online', function() {
+        console.log('网络连接已恢复，重新优化播放参数');
+        if (hls) {
+          // 网络恢复时重新调整配置
+          hls.recoverMediaError();
+        }
+      });
+    }
   </script>
 </body>
 
