@@ -201,6 +201,9 @@
       align-items: center;
       cursor: pointer;
       touch-action: none;
+      position: relative;
+      padding: 10px 0; /* 增加垂直方向的触摸区域 */
+      margin: -10px 0; /* 抵消padding的影响，保持布局不变 */
     }
 
     .progress-container {
@@ -1050,7 +1053,15 @@
 
     const handleProgress = (e, isFinal = false) => {
       if (!wrapRect) wrapRect = wrap.getBoundingClientRect();
-      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      // 处理触摸事件和鼠标事件
+      let clientX;
+      if (e.touches && e.touches.length > 0) {
+        clientX = e.touches[0].clientX;
+      } else if (e.changedTouches && e.changedTouches.length > 0) {
+        clientX = e.changedTouches[0].clientX;
+      } else {
+        clientX = e.clientX;
+      }
       const p = Math.max(0, Math.min(1, (clientX - wrapRect.left) / wrapRect.width));
       const newTime = p * video.duration;
       
@@ -1099,6 +1110,13 @@
       }
     };
 
+    // 添加全局触摸事件处理，防止页面滚动影响进度条拖动
+    document.addEventListener('touchmove', function(e) {
+      if (isDragging) {
+        e.preventDefault();
+      }
+    }, { passive: false });
+
     wrap.ontouchstart = (e) => {
       e.preventDefault();
       if (!video.duration) return; // 没有视频时长则不处理
@@ -1118,6 +1136,15 @@
     };
 
     wrap.ontouchend = (e) => {
+      if (isDragging) {
+        handleProgress(e, true);
+        // 拖拽结束后恢复进度条更新
+        video.addEventListener('timeupdate', updateProgressBar);
+      }
+    };
+    
+    // 添加触摸取消事件处理，防止意外中断
+    wrap.ontouchcancel = (e) => {
       if (isDragging) {
         handleProgress(e, true);
         // 拖拽结束后恢复进度条更新
