@@ -547,20 +547,20 @@
     // 根据网络状况调整HLS配置
     function getHlsConfigForNetwork(networkQuality) {
       const baseConfig = {
-        // 缓冲区优化 - 优化卡顿问题
+        // 缓冲区优化 - 解决缓冲停滞问题
         backBufferLength: 90, // 增加后缓冲区，减少卡顿
-        maxBufferLength: 120, // 增加最大缓冲区长度，提高流畅度
-        maxMaxBufferLength: 150, // 最大缓冲区长度上限
+        maxBufferLength: 30, // 适中缓冲长度，平衡流畅度和内存使用
+        maxMaxBufferLength: 60, // 最大缓冲区长度上限
         // 加载策略 - 优化卡顿问题
-        liveSyncDurationCount: 8, // 增加直播同步片段数，提高稳定性
-        maxLoadingDelay: 6, // 增加加载延迟，避免频繁加载
-        maxStarvationDelay: 6, // 增加饥饿延迟，减少卡顿
+        liveSyncDurationCount: 3, // 减少直播同步片段数，降低延迟
+        maxLoadingDelay: 4, // 减少加载延迟
+        maxStarvationDelay: 3, // 减少饥饿延迟
         // 自适应码率 - 针对卡顿问题优化
-        abrEwmaFastLive: 4.0, // 调整快速带宽估算时间常数，更平滑切换
-        abrEwmaSlowLive: 10.0, // 调整慢速带宽估算时间常数，避免频繁切换
+        abrEwmaFastLive: 1.0, // 调整快速带宽估算时间常数，更平滑切换
+        abrEwmaSlowLive: 3.0, // 调整慢速带宽估算时间常数，避免频繁切换
         abrEwmaDefaultEstimate: 5e5, // 默认带宽估算 (500 kbps)
-        abrBandWidthFactor: 0.9, // 带宽使用因子
-        abrBandWidthUpFactor: 0.8, // 上调带宽因子，更保守
+        abrBandWidthFactor: 0.95, // 带宽使用因子
+        abrBandWidthUpFactor: 0.7, // 上调带宽因子，更保守
         // 性能优化
         enableWorker: true, // 使用web worker解码，减少主线程阻塞
         workerPath: null, // 使用默认worker路径
@@ -570,39 +570,39 @@
         // 关键帧对齐
         forceKeyFrameOnDiscontinuity: true,
         // 网络请求优化
-        maxBufferHole: 0.05, // 适当增加缓冲间隙，避免频繁调整
-        highBufferWatchdogPeriod: 3, // 增加高缓冲监控周期
-        nudgeMaxRetry: 5, // 增加同步重试次数
-        maxFragLookUpTolerance: 0.05, // 增加片段查找容差，提升拖拽体验
+        maxBufferHole: 0.01, // 减少缓冲间隙，避免频繁调整
+        highBufferWatchdogPeriod: 2, // 减少高缓冲监控周期
+        nudgeMaxRetry: 3, // 减少同步重试次数
+        maxFragLookUpTolerance: 0.01, // 减少片段查找容差，提升拖拽体验
         // 优化加载行为
         startFragPrefetch: true, // 预加载第一个片段
         testBandwidth: true, // 测试带宽以选择合适的质量
         // 错误处理优化
-        nudgeOffset: 0.1, // 增加调整同步偏移，改善拖拽后播放
+        nudgeOffset: 0.05, // 减少调整同步偏移，改善拖拽后播放
         // 启用网络优化
         xhrSetup: function (xhr, url) {
           // 允许跨域请求，添加移动端网络优化
           xhr.withCredentials = false;
           // 设置请求超时时间
-          xhr.timeout = 30000; // 30秒超时，给更多时间加载
+          xhr.timeout = 20000; // 20秒超时，给更多时间加载
           // 添加自定义请求头以匹配nginx配置
           xhr.setRequestHeader('Accept', '*/*');
           xhr.setRequestHeader('Accept-Encoding', 'identity'); // 避免压缩导致的兼容性问题
         },
         // 启用后处理以优化性能
-        fragLoadingTimeOut: 30000, // 片段加载超时
-        fragLoadingMaxRetry: 10, // 片段加载最大重试次数
-        fragLoadingMaxRetryTimeout: 90000, // 片段加载最大重试超时
-        levelLoadingTimeOut: 30000, // 级别加载超时
-        levelLoadingMaxRetry: 10, // 级别加载最大重试次数
-        levelLoadingMaxRetryTimeout: 90000, // 级别加载最大重试超时
+        fragLoadingTimeOut: 20000, // 片段加载超时
+        fragLoadingMaxRetry: 6, // 片段加载最大重试次数
+        fragLoadingMaxRetryTimeout: 60000, // 片段加载最大重试超时
+        levelLoadingTimeOut: 20000, // 级别加载超时
+        levelLoadingMaxRetry: 3, // 级别加载最大重试次数
+        levelLoadingMaxRetryTimeout: 60000, // 级别加载最大重试超时
         // 其他优化参数
-        maxBufferSize: 100 * 1000 * 1000, // 最大缓冲区大小 100MB
-        appendErrorMaxRetry: 5, // 追加错误最大重试次数
+        maxBufferSize: 60 * 1000 * 1000, // 最大缓冲区大小 60MB
+        appendErrorMaxRetry: 3, // 追加错误最大重试次数
         enableSoftwareAES: true, // 启用软件AES解密
-        manifestLoadingTimeOut: 30000, // 清单加载超时
-        manifestLoadingMaxRetry: 5, // 清单加载最大重试次数
-        manifestLoadingMaxRetryTimeout: 90000, // 清单加载最大重试超时
+        manifestLoadingTimeOut: 20000, // 清单加载超时
+        manifestLoadingMaxRetry: 3, // 清单加载最大重试次数
+        manifestLoadingMaxRetryTimeout: 60000, // 清单加载最大重试超时
         // 优化拖拽体验的参数
         capLevelOnFPSDrop: false, // 不因帧率下降降低画质
         capLevelToPlayerSize: false, // 不因播放器尺寸限制画质
@@ -612,22 +612,22 @@
         enableStats: false, // 禁用统计收集
         timelineLifter: true, // 启用时间线提升
         // 优化seek性能
-        maxSeekHole: 2, // 最大seek空洞
+        maxSeekHole: 1, // 最大seek空洞
         // 级别加载策略
         levelLoadingLoadPolicy: { // 级别加载策略
           default: {
-            maxTimeToFirstByte: 15000,
-            maxLoadTime: 30000,
-            timeoutRetryDelay: 2000,
-            errorRetryDelay: 3000
+            maxTimeToFirstByte: 10000,
+            maxLoadTime: 20000,
+            timeoutRetryDelay: 1000,
+            errorRetryDelay: 2000
           }
         },
         fragLoadingLoadPolicy: { // 片段加载策略
           default: {
-            maxTimeToFirstByte: 15000,
-            maxLoadTime: 30000,
-            timeoutRetryDelay: 2000,
-            errorRetryDelay: 3000
+            maxTimeToFirstByte: 10000,
+            maxLoadTime: 20000,
+            timeoutRetryDelay: 1000,
+            errorRetryDelay: 2000
           }
         }
       };
@@ -672,7 +672,7 @@
       return baseConfig;
     }
 
-    // 错误处理函数
+    // 改进的错误处理函数
     function handleHlsError(error) {
       console.error('HLS Error:', error);
       
@@ -680,33 +680,47 @@
         console.error('Error Details:', error.details);
       }
       
-      if (error.fatal) {
-        switch(error.type) {
-          case Hls.ErrorTypes.NETWORK_ERROR:
-            console.warn('Fatal network error, try to recover');
-            setTimeout(() => {
-              if (hls) {
-                hls.startLoad();
-              }
-            }, 2000);
-            break;
-          case Hls.ErrorTypes.MEDIA_ERROR:
-            console.warn('Fatal media error, try to recover');
-            setTimeout(() => {
-              if (hls) {
-                hls.recoverMediaError();
-              }
-            }, 2000);
-            break;
-          default:
-            console.error('Unrecoverable error, reload player');
-            // 尝试重新初始化播放器
+      // 非致命错误的处理
+      if (!error.fatal) {
+        // 对于缓冲停滞错误，增加一些缓冲配置
+        if (error.details === 'bufferStalledError' || error.details === 'bufferNudgeOnStall') {
+          console.warn('Handling buffer stall error...');
+          // 不需要特别处理，HLS.js会自动处理
+        } else if (error.details === 'fragLoadError') {
+          console.warn('Fragment loading error, retrying...');
+        }
+        return; // 非致命错误直接返回
+      }
+      
+      // 致命错误的处理
+      switch(error.type) {
+        case Hls.ErrorTypes.NETWORK_ERROR:
+          console.warn('Fatal network error, try to recover');
+          // 增加重试逻辑
+          setTimeout(() => {
+            if (hls) {
+              hls.startLoad();
+            }
+          }, 2000);
+          break;
+        case Hls.ErrorTypes.MEDIA_ERROR:
+          console.warn('Fatal media error, try to recover');
+          // 先销毁现有实例，然后重新创建
+          setTimeout(() => {
             const currentSrc = video.src || (hls && hls.url);
             if (currentSrc) {
               startVideo(currentSrc, $('videoTitle').innerText, !video.paused);
             }
-            break;
-        }
+          }, 1000);
+          break;
+        default:
+          console.error('Unrecoverable error, reload player');
+          // 尝试重新初始化播放器
+          const currentSrc = video.src || (hls && hls.url);
+          if (currentSrc) {
+            startVideo(currentSrc, $('videoTitle').innerText, !video.paused);
+          }
+          break;
       }
     }
 
@@ -861,7 +875,21 @@
 
     function startVideo(m3u8, name, auto = true) {
       if (!m3u8) return;
-      if (hls) hls.destroy();
+      
+      // 销毁现有的HLS实例并清理相关事件监听器
+      if (hls) {
+        hls.off(Hls.Events.ERROR);  // 移除错误事件监听器
+        hls.off(Hls.Events.MANIFEST_PARSED);  // 移除manifest解析事件监听器
+        hls.off(Hls.Events.BUFFER_APPENDED);  // 移除缓冲追加事件监听器
+        hls.off(Hls.Events.LEVEL_LOADED);  // 移除级别加载事件监听器
+        hls.destroy();  // 销毁HLS实例
+        hls = null;
+      }
+      
+      // 清理video元素
+      video.removeAttribute('src');
+      video.load(); // 重新加载以清除之前的缓冲
+      
       isLoaded = true;
       $('videoTitle').innerText = (name || "VIDEO").split('_')[0].toUpperCase();
       let finalUrl = m3u8.replace("https://surrit.com/", "/s1/");
@@ -950,6 +978,7 @@
         }
       };
 
+
       // 预缓存指定时间段的函数
       function preloadTimeRange(secondsToPreload) {
         // 这个函数用于确保指定秒数的内容已被缓冲
@@ -1011,7 +1040,7 @@
       setTimeout(() => {
         if (video.buffered.length > 0) {
           const bufferedEnd = video.buffered.end(video.buffered.length - 1);
-          const needPreload = seekTime + 30; // 预加载30秒内容
+          const needPreload = Math.min(video.duration || Infinity, seekTime + 30); // 预加载30秒内容，但不超过视频总长度
           if (bufferedEnd < needPreload) {
             // 触发加载更多内容
             if (hls && hls.loadLevel) {
