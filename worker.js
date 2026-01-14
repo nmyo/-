@@ -28,6 +28,162 @@ const CONVERTER_BACKENDS = [
   { id: 'sub.xjz.im', name: 'sub.xjz.im', label: '920.im提供' }
 ];
 
+// 节点分类规则配置
+const NODE_CLASSIFICATION_RULES = {
+  // 按地理位置分类
+  geography: {
+    pattern: /(?:日本|东京|大阪|JP|Japan|Osaka|Tokyo|韓國|韓|KR|Korea|Seoul|首爾|台灣|TW|Taiwan|Hong Kong|HK|香港|Singapore|SG|新加坡|美國|US|USA|America|英國|UK|England|德國|DE|Germany|法國|FR|France|荷蘭|NL|Netherlands|加拿大|CA|Canada|澳洲|AU|Australia|俄羅斯|RU|Russia|印度|IN|India)/i,
+    categories: {
+      '日本': /(?:日本|东京|大阪|JP|Japan|Osaka|Tokyo)/i,
+      '韓國': /(?:韓國|韓|KR|Korea|Seoul|首爾)/i,
+      '台灣': /(?:台灣|TW|Taiwan)/i,
+      '香港': /(?:Hong Kong|HK|香港)/i,
+      '新加坡': /(?:Singapore|SG|新加坡)/i,
+      '美國': /(?:美國|US|USA|America)/i,
+      '英國': /(?:英國|UK|England)/i,
+      '德國': /(?:德國|DE|Germany)/i,
+      '法國': /(?:法國|FR|France)/i,
+      '荷蘭': /(?:荷蘭|NL|Netherlands)/i,
+      '加拿大': /(?:加拿大|CA|Canada)/i,
+      '澳洲': /(?:澳洲|AU|Australia)/i,
+      '俄羅斯': /(?:俄羅斯|RU|Russia)/i,
+      '印度': /(?:印度|IN|India)/i
+    }
+  },
+  // 按运营商分类
+  operator: {
+    pattern: /(?:電信|聯通|移動|CT|CU|CM|ChinaNet|联通|移动|电信|中國|China|CHN|中國聯通|中國電信|中國移動)/i,
+    categories: {
+      '中國電信': /(?:中國電信|CT|ChinaNet|电信)/i,
+      '中國聯通': /(?:中國聯通|CU|联通)/i,
+      '中國移動': /(?:中國移動|CM|移动)/i,
+      '國際線路': /(?:國際|International|Intl)/i
+    }
+  },
+  // 按速度分类
+  speed: {
+    pattern: /(?:高速|快|SS|SSR|V2RAY|VLESS|VMES|TROJAN|HYSTERIA2|TUIC|SPEED|FAST|PRO|PLUS|VIP|Premium|Enterprise|Business)/i,
+    categories: {
+      '高速': /(?:高速|快|SPEED|FAST|PRO|PLUS|Premium|Enterprise|Business)/i,
+      '普通': /(?:普通|Normal|Standard)/i,
+      'VIP': /(?:VIP|Plus|Pro)/i
+    }
+  },
+  // 按用途分类
+  purpose: {
+    pattern: /(?:遊戲|Game|流媒體|Media|Netflix|YouTube|Spotify|Apple TV|Disney|HBO|串流|Stream|Torrent|BT|P2P)/i,
+    categories: {
+      '遊戲': /(?:遊戲|Game)/i,
+      '流媒體': /(?:流媒體|Media|Netflix|YouTube|Spotify|Apple TV|Disney|HBO|串流|Stream)/i,
+      'BT': /(?:Torrent|BT|P2P)/i,
+      '通用': /(?:通用|General|All)/i
+    }
+  }
+};
+
+// 节点分类功能
+function classifyNodeByLabel(nodeName) {
+  const classifications = {};
+  
+  for (const [categoryType, categoryConfig] of Object.entries(NODE_CLASSIFICATION_RULES)) {
+    let matchedCategory = null;
+    
+    // 遍历具体的分类规则
+    for (const [categoryName, regex] of Object.entries(categoryConfig.categories)) {
+      if (regex.test(nodeName)) {
+        matchedCategory = categoryName;
+        break;
+      }
+    }
+    
+    if (matchedCategory) {
+      classifications[categoryType] = matchedCategory;
+    } else {
+      // 如果没有匹配到具体分类，则使用通用匹配
+      if (categoryConfig.pattern.test(nodeName)) {
+        classifications[categoryType] = '其他';
+      }
+    }
+  }
+  
+  return classifications;
+}
+
+// 获取所有可能的节点分类
+function getAllNodeClassifications() {
+  const allCategories = {};
+  
+  for (const [categoryType, categoryConfig] of Object.entries(NODE_CLASSIFICATION_RULES)) {
+    allCategories[categoryType] = Object.keys(categoryConfig.categories);
+  }
+  
+  return allCategories;
+}
+
+// 根据分类过滤节点
+function filterNodesByClassification(nodes, classificationFilters) {
+  return nodes.filter(node => {
+    const nodeClassifications = classifyNodeByLabel(node.name);
+    
+    // 检查是否符合所有分类过滤条件
+    for (const [categoryType, categoryValue] of Object.entries(classificationFilters)) {
+      if (categoryValue && nodeClassifications[categoryType] !== categoryValue) {
+        return false;
+      }
+    }
+    
+    return true;
+  });
+}
+
+// 扩展获取节点的函数，支持分类
+async function handleGetNodesWithClassification(env, subscriptionPath, classificationFilters = null) {
+  const query = classificationFilters ? `
+    SELECT
+      n.id,
+      n.name,
+      n.original_link,
+      n.node_order,
+      COALESCE(n.enabled, 1) as enabled
+    FROM nodes n
+    JOIN subscriptions s ON n.subscription_id = s.id
+    WHERE s.path = ?
+    ORDER BY n.node_order ASC
+  ` : `
+    SELECT
+      n.id,
+      n.name,
+      n.original_link,
+      n.node_order,
+      COALESCE(n.enabled, 1) as enabled,
+      json_object(
+        'geography', classifyNodeByLabel(n.name)['geography'],
+        'operator', classifyNodeByLabel(n.name)['operator'],
+        'speed', classifyNodeByLabel(n.name)['speed'],
+        'purpose', classifyNodeByLabel(n.name)['purpose']
+      ) as classification
+    FROM nodes n
+    JOIN subscriptions s ON n.subscription_id = s.id
+    WHERE s.path = ?
+    ORDER BY n.node_order ASC
+  `;
+  
+  const { results } = await env.DB.prepare(query).bind(subscriptionPath).all();
+  
+  if (classificationFilters && results) {
+    const filteredResults = filterNodesByClassification(results, classificationFilters);
+    return createSuccessResponse(filteredResults);
+  }
+  
+  // 添加分类信息到结果中
+  const resultsWithClassification = results.map(node => ({
+    ...node,
+    classification: classifyNodeByLabel(node.name)
+  }));
+  
+  return createSuccessResponse(resultsWithClassification);
+}
+
 function extractNodeName(nodeLink) {
   if (!nodeLink) return '未命名节点';
   
@@ -116,7 +272,7 @@ export default {
       }
 
       // 处理节点管理API请求
-      const nodeApiMatch = pathname.match(new RegExp(`^/${adminPath}/api/subscriptions/([^/]+)/nodes(?:/([^/]+|reorder|batch|batch-delete|replace))?$`));
+      const nodeApiMatch = pathname.match(new RegExp(`^/${adminPath}/api/subscriptions/([^/]+)/nodes(?:/([^/]+|reorder|batch|batch-delete|replace|classify|with-classification))?$`));
       if (nodeApiMatch) {
         const subscriptionPath = nodeApiMatch[1];
         const nodeId = nodeApiMatch[2];
@@ -182,6 +338,12 @@ export default {
           
           if (!nodeId && method === 'GET') {
             return handleGetNodes(env, subscriptionPath);
+          }
+          if (nodeId === 'classify' && method === 'GET') {
+            return handleGetClassifiedNodes(env, subscriptionPath);
+          }
+          if (nodeId === 'with-classification' && method === 'GET') {
+            return handleGetNodesWithClassification(env, subscriptionPath);
           }
           
           if (!nodeId && method === 'POST') {
@@ -5393,4 +5555,88 @@ function parseTuicToSurge(tuicLink) {
   catch (error) {
     return null;
   }
+}
+
+// 获取分类后的节点列表
+async function handleGetClassifiedNodes(env, subscriptionPath) {
+  const { results } = await env.DB.prepare(`
+    SELECT
+      n.id,
+      n.name,
+      n.original_link,
+      n.node_order,
+      COALESCE(n.enabled, 1) as enabled
+    FROM nodes n
+    JOIN subscriptions s ON n.subscription_id = s.id
+    WHERE s.path = ?
+    ORDER BY n.node_order ASC
+  `).bind(subscriptionPath).all();
+
+  // 按分类组织节点
+  const nodes = (results || []).map(node => ({
+    ...node,
+    classification: classifyNodeByLabel(node.name)
+  }));
+
+  // 按分类归类节点
+  const classifiedNodes = {};
+  
+  nodes.forEach(node => {
+    for (const [categoryType, categoryValue] of Object.entries(node.classification)) {
+      if (!classifiedNodes[categoryType]) {
+        classifiedNodes[categoryType] = {};
+      }
+      
+      if (!classifiedNodes[categoryType][categoryValue]) {
+        classifiedNodes[categoryType][categoryValue] = [];
+      }
+      
+      classifiedNodes[categoryType][categoryValue].push(node);
+    }
+  });
+
+  return createSuccessResponse({
+    nodes,
+    classifiedNodes,
+    classifications: getAllNodeClassifications()
+  });
+}
+
+// 获取节点分类统计信息
+async function handleGetNodeClassificationStats(env, subscriptionPath) {
+  const { results } = await env.DB.prepare(`
+    SELECT
+      n.name
+    FROM nodes n
+    JOIN subscriptions s ON n.subscription_id = s.id
+    WHERE s.path = ?
+  `).bind(subscriptionPath).all();
+
+  const nodes = results || [];
+  const stats = {};
+
+  // 初始化统计对象
+  for (const [categoryType, categories] of Object.entries(getAllNodeClassifications())) {
+    stats[categoryType] = {};
+    for (const category of categories) {
+      stats[categoryType][category] = 0;
+    }
+    stats[categoryType]['其他'] = 0;
+  }
+
+  // 统计各分类下的节点数量
+  nodes.forEach(node => {
+    const classifications = classifyNodeByLabel(node.name);
+    
+    for (const [categoryType, categoryValue] of Object.entries(classifications)) {
+      if (stats[categoryType] && stats[categoryType][categoryValue] !== undefined) {
+        stats[categoryType][categoryValue]++;
+      } else if (stats[categoryType]) {
+        // 如果分类值不在预定义范围内，计入"其他"
+        stats[categoryType]['其他']++;
+      }
+    }
+  });
+
+  return createSuccessResponse(stats);
 }

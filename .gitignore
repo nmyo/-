@@ -1,3 +1,1 @@
-(index.html is a source file, so no additional ignores are needed beyond what's already in the current .gitignore if anything)
-
-# No additional ignores needed for this change set
+Nothing needs to be added to .gitignore since only a JavaScript source file (worker.js) was modified and no build artifacts, dependencies, or temporary files were detected in the changes.
