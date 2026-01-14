@@ -15,153 +15,40 @@ const NODE_TYPES = {
   SNELL: 'snell,'
 };
 
-// 订阅转换器后端列表
-const CONVERTER_BACKENDS = [
-  { id: 'sub.xeton.dev', name: 'sub.xeton.dev', label: 'subconverter作者提供-稳定' },
-  { id: 'api.wcc.best', name: 'api.wcc.best', label: 'sub-web作者提供-稳定' },
-  { id: 'sub.id9.cc', name: 'sub.id9.cc', label: '品云提供' },
-  { id: 'api.v1.mk', name: 'api.v1.mk', label: '肥羊提供' },
-  { id: 'api.nexconvert.com', name: 'api.nexconvert.com', label: '奶昔提供' },
-  { id: 'api.dler.io', name: 'api.dler.io', label: 'lhie1提供' },
-  { id: 'sub.maoxiongnet.com', name: 'sub.maoxiongnet.com', label: '猫熊提供' },
-  { id: 'api.sublink.dev', name: 'api.sublink.dev', label: '歪兔提供' },
-  { id: 'sub.xjz.im', name: 'sub.xjz.im', label: '920.im提供' }
-];
 
-// 节点分类规则配置
-const NODE_CLASSIFICATION_RULES = {
-  // 按地理位置分类
-  geography: {
-    pattern: /(?:日本|东京|大阪|JP|Japan|Osaka|Tokyo|韓國|韓|KR|Korea|Seoul|首爾|台灣|TW|Taiwan|Hong Kong|HK|香港|Singapore|SG|新加坡|美國|US|USA|America|英國|UK|England|德國|DE|Germany|法國|FR|France|荷蘭|NL|Netherlands|加拿大|CA|Canada|澳洲|AU|Australia|俄羅斯|RU|Russia|印度|IN|India)/i,
-    categories: {
-      '日本': /(?:日本|东京|大阪|JP|Japan|Osaka|Tokyo)/i,
-      '韓國': /(?:韓國|韓|KR|Korea|Seoul|首爾)/i,
-      '台灣': /(?:台灣|TW|Taiwan)/i,
-      '香港': /(?:Hong Kong|HK|香港)/i,
-      '新加坡': /(?:Singapore|SG|新加坡)/i,
-      '美國': /(?:美國|US|USA|America)/i,
-      '英國': /(?:英國|UK|England)/i,
-      '德國': /(?:德國|DE|Germany)/i,
-      '法國': /(?:法國|FR|France)/i,
-      '荷蘭': /(?:荷蘭|NL|Netherlands)/i,
-      '加拿大': /(?:加拿大|CA|Canada)/i,
-      '澳洲': /(?:澳洲|AU|Australia)/i,
-      '俄羅斯': /(?:俄羅斯|RU|Russia)/i,
-      '印度': /(?:印度|IN|India)/i
-    }
-  },
-  // 按运营商分类
-  operator: {
-    pattern: /(?:電信|聯通|移動|CT|CU|CM|ChinaNet|联通|移动|电信|中國|China|CHN|中國聯通|中國電信|中國移動)/i,
-    categories: {
-      '中國電信': /(?:中國電信|CT|ChinaNet|电信)/i,
-      '中國聯通': /(?:中國聯通|CU|联通)/i,
-      '中國移動': /(?:中國移動|CM|移动)/i,
-      '國際線路': /(?:國際|International|Intl)/i
-    }
-  },
-  // 按速度分类
-  speed: {
-    pattern: /(?:高速|快|SS|SSR|V2RAY|VLESS|VMES|TROJAN|HYSTERIA2|TUIC|SPEED|FAST|PRO|PLUS|VIP|Premium|Enterprise|Business)/i,
-    categories: {
-      '高速': /(?:高速|快|SPEED|FAST|PRO|PLUS|Premium|Enterprise|Business)/i,
-      '普通': /(?:普通|Normal|Standard)/i,
-      'VIP': /(?:VIP|Plus|Pro)/i
-    }
-  },
-  // 按用途分类
-  purpose: {
-    pattern: /(?:遊戲|Game|流媒體|Media|Netflix|YouTube|Spotify|Apple TV|Disney|HBO|串流|Stream|Torrent|BT|P2P)/i,
-    categories: {
-      '遊戲': /(?:遊戲|Game)/i,
-      '流媒體': /(?:流媒體|Media|Netflix|YouTube|Spotify|Apple TV|Disney|HBO|串流|Stream)/i,
-      'BT': /(?:Torrent|BT|P2P)/i,
-      '通用': /(?:通用|General|All)/i
-    }
-  }
-};
-
-// 节点分类功能
-function classifyNodeByLabel(nodeName) {
-  const classifications = {};
-  
-  for (const [categoryType, categoryConfig] of Object.entries(NODE_CLASSIFICATION_RULES)) {
-    let matchedCategory = null;
-    
-    // 遍历具体的分类规则
-    for (const [categoryName, regex] of Object.entries(categoryConfig.categories)) {
-      if (regex.test(nodeName)) {
-        matchedCategory = categoryName;
-        break;
-      }
-    }
-    
-    if (matchedCategory) {
-      classifications[categoryType] = matchedCategory;
-    } else {
-      // 如果没有匹配到具体分类，则使用通用匹配
-      if (categoryConfig.pattern.test(nodeName)) {
-        classifications[categoryType] = '其他';
-      }
-    }
-  }
-  
-  return classifications;
+// 用户手动输入的标签功能
+function validateTag(tag) {
+  // 验证标签格式：只允许字母、数字、中文、横线、下划线，长度在1-20字符之间
+  return /^[\w\u4e00-\u9fa5\-]{1,20}$/.test(tag);
 }
 
-// 获取所有可能的节点分类
-function getAllNodeClassifications() {
-  const allCategories = {};
-  
-  for (const [categoryType, categoryConfig] of Object.entries(NODE_CLASSIFICATION_RULES)) {
-    allCategories[categoryType] = Object.keys(categoryConfig.categories);
+// 根据标签过滤节点
+function filterNodesByTag(nodes, tags) {
+  if (!tags || tags.length === 0) {
+    return nodes;
   }
   
-  return allCategories;
-}
-
-// 根据分类过滤节点
-function filterNodesByClassification(nodes, classificationFilters) {
   return nodes.filter(node => {
-    const nodeClassifications = classifyNodeByLabel(node.name);
+    if (!node.tags) return false;
     
-    // 检查是否符合所有分类过滤条件
-    for (const [categoryType, categoryValue] of Object.entries(classificationFilters)) {
-      if (categoryValue && nodeClassifications[categoryType] !== categoryValue) {
-        return false;
-      }
-    }
+    // 如果是字符串，分割成数组
+    const nodeTags = Array.isArray(node.tags) ? node.tags : node.tags.split(',');
     
-    return true;
+    // 检查节点是否包含任意一个指定标签
+    return tags.some(tag => nodeTags.includes(tag));
   });
 }
 
-// 扩展获取节点的函数，支持分类
-async function handleGetNodesWithClassification(env, subscriptionPath, classificationFilters = null) {
-  const query = classificationFilters ? `
-    SELECT
-      n.id,
-      n.name,
-      n.original_link,
-      n.node_order,
-      COALESCE(n.enabled, 1) as enabled
-    FROM nodes n
-    JOIN subscriptions s ON n.subscription_id = s.id
-    WHERE s.path = ?
-    ORDER BY n.node_order ASC
-  ` : `
+// 扩展获取节点的函数，支持按标签筛选
+async function handleGetNodesWithTags(env, subscriptionPath, tags = null) {
+  const query = `
     SELECT
       n.id,
       n.name,
       n.original_link,
       n.node_order,
       COALESCE(n.enabled, 1) as enabled,
-      json_object(
-        'geography', classifyNodeByLabel(n.name)['geography'],
-        'operator', classifyNodeByLabel(n.name)['operator'],
-        'speed', classifyNodeByLabel(n.name)['speed'],
-        'purpose', classifyNodeByLabel(n.name)['purpose']
-      ) as classification
+      n.tags
     FROM nodes n
     JOIN subscriptions s ON n.subscription_id = s.id
     WHERE s.path = ?
@@ -170,18 +57,12 @@ async function handleGetNodesWithClassification(env, subscriptionPath, classific
   
   const { results } = await env.DB.prepare(query).bind(subscriptionPath).all();
   
-  if (classificationFilters && results) {
-    const filteredResults = filterNodesByClassification(results, classificationFilters);
+  if (tags && tags.length > 0) {
+    const filteredResults = filterNodesByTag(results, tags);
     return createSuccessResponse(filteredResults);
   }
   
-  // 添加分类信息到结果中
-  const resultsWithClassification = results.map(node => ({
-    ...node,
-    classification: classifyNodeByLabel(node.name)
-  }));
-  
-  return createSuccessResponse(resultsWithClassification);
+  return createSuccessResponse(results || []);
 }
 
 function extractNodeName(nodeLink) {
@@ -272,7 +153,7 @@ export default {
       }
 
       // 处理节点管理API请求
-      const nodeApiMatch = pathname.match(new RegExp(`^/${adminPath}/api/subscriptions/([^/]+)/nodes(?:/([^/]+|reorder|batch|batch-delete|replace|classify|with-classification))?$`));
+      const nodeApiMatch = pathname.match(new RegExp(`^/${adminPath}/api/subscriptions/([^/]+)/nodes(?:/([^/]+|reorder|batch|batch-delete|replace|by-tags))?$`));
       if (nodeApiMatch) {
         const subscriptionPath = nodeApiMatch[1];
         const nodeId = nodeApiMatch[2];
@@ -339,11 +220,11 @@ export default {
           if (!nodeId && method === 'GET') {
             return handleGetNodes(env, subscriptionPath);
           }
-          if (nodeId === 'classify' && method === 'GET') {
-            return handleGetClassifiedNodes(env, subscriptionPath);
-          }
-          if (nodeId === 'with-classification' && method === 'GET') {
-            return handleGetNodesWithClassification(env, subscriptionPath);
+          if (nodeId === 'by-tags' && method === 'GET') {
+            const urlParams = new URLSearchParams(url.search);
+            const tagsParam = urlParams.get('tags');
+            const tags = tagsParam ? tagsParam.split(',') : [];
+            return handleGetNodesWithTags(env, subscriptionPath, tags);
           }
           
           if (!nodeId && method === 'POST') {
@@ -411,7 +292,7 @@ export default {
             
             const now = Date.now();
             const result = await env.DB.prepare(
-              "INSERT INTO subscriptions (name, path, sub_order, updated_at, converter_backend) VALUES (?, ?, ?, ?, ?)"
+              "INSERT INTO subscriptions (name, path, sub_order, updated_at) VALUES (?, ?, ?, ?)"
             ).bind(name, path, now, now, 'sub.xeton.dev').run();
 
             if (!result.success) {
@@ -423,7 +304,7 @@ export default {
             console.error('创建订阅失败:', error);
             return createErrorResponse('创建订阅失败: ' + error.message);
           }
-        }
+              "INSERT INTO subscriptions (name, path, sub_order, updated_at) VALUES (?, ?, ?, ?)"
         
         const updateMatch = pathname.match(new RegExp(`^/${adminPath}/api/subscriptions/([^/]+)$`));
         if (updateMatch && method === 'PUT') {
@@ -598,12 +479,14 @@ async function handleReplaceNodes(request, env, subscriptionPath) {
       }
       
       const nodeName = node.name || extractNodeName(originalLink);
+      const nodeName = node.name || extractNodeName(originalLink);
       const nodeOrder = node.order !== undefined ? node.order : (now + i);
-      
+      const tags = node.tags || ""; // 获取标签，如果未提供则为空字符串
+
       statements.push(
         env.DB.prepare(
-          "INSERT INTO nodes (subscription_id, name, original_link, node_order, enabled) VALUES (?, ?, ?, ?, 1)"
-        ).bind(subscriptionId, nodeName, originalLink, nodeOrder)
+          "INSERT INTO nodes (subscription_id, name, original_link, node_order, enabled, tags) VALUES (?, ?, ?, ?, 1, ?)"
+        ).bind(subscriptionId, nodeName, originalLink, nodeOrder, tags)
       );
     }
     
@@ -666,11 +549,12 @@ async function handleBatchCreateNodes(request, env, subscriptionPath) {
       
       const nodeName = node.name || extractNodeName(originalLink);
       const nodeOrder = node.order !== undefined ? node.order : (now + i);
-      
+      const tags = node.tags || ""; // 获取标签，如果未提供则为空字符串
+
       statements.push(
         env.DB.prepare(
-          "INSERT INTO nodes (subscription_id, name, original_link, node_order, enabled) VALUES (?, ?, ?, ?, 1)"
-        ).bind(subscriptionId, nodeName, originalLink, nodeOrder)
+          "INSERT INTO nodes (subscription_id, name, original_link, node_order, enabled, tags) VALUES (?, ?, ?, ?, 1, ?)"
+        ).bind(subscriptionId, nodeName, originalLink, nodeOrder, tags)
       );
     }
     
@@ -4174,7 +4058,7 @@ document.getElementById('globalStats').textContent =
       } catch (error) {
         showToast('更新失败: ' + error.message, 'danger');
       }
-    }
+          body: JSON.stringify({ name, path, action: "update_info" })
 
     // 确认删除订阅
     async function confirmDeleteSubscription() {
@@ -4262,7 +4146,7 @@ async function handleGetSubscriptions(env) {
     name: item.name,
     path: item.path,
     nodeCount: item.nodeCount || 0,
-    sub_order: item.sub_order || 0,
+      s.name, s.path, s.sub_order, s.updated_at, COUNT(n.id) as nodeCount
     updated_at: item.updated_at || null,
     converter_backend: item.converter_backend || 'sub.xeton.dev'
   }));
@@ -4276,7 +4160,7 @@ async function handleGetNodes(env, subscriptionPath) {
     SELECT 
       n.id,
       n.name,
-      n.original_link,
+    converter_backend: "default"
       n.node_order,
       COALESCE(n.enabled, 1) as enabled
     FROM nodes n
@@ -4324,12 +4208,13 @@ async function handleCreateNode(request, env, subscriptionPath) {
   
   let nodeName = extractNodeName(originalLink);
   const nodeOrder = nodeData.order || now;
+  const tags = nodeData.tags || ''; // 获取标签，如果未提供则为空字符串
 
   await env.DB.batch([
     env.DB.prepare(`
-      INSERT INTO nodes (subscription_id, name, original_link, node_order, enabled) 
-      VALUES (?, ?, ?, ?, 1)
-    `).bind(subscriptionId, nodeName, originalLink, nodeOrder),
+      INSERT INTO nodes (subscription_id, name, original_link, node_order, enabled, tags) 
+      VALUES (?, ?, ?, ?, 1, ?)
+    `).bind(subscriptionId, nodeName, originalLink, nodeOrder, tags),
     env.DB.prepare(
       "UPDATE subscriptions SET updated_at = ? WHERE id = ?"
     ).bind(now, subscriptionId)
@@ -4641,7 +4526,7 @@ async function handleUpdateSubscriptionInfo(env, path, data) {
     if (!results?.[0]) {
       return createErrorResponse('更新失败：找不到订阅', 404);
     }
-
+        "UPDATE subscriptions SET name = ?, path = ? WHERE path = ?"
     return createSuccessResponse(results[0], '订阅信息已更新');
   } catch (error) {
     return createErrorResponse('更新订阅信息失败: ' + error.message);
@@ -4689,13 +4574,14 @@ async function handleUpdateNode(request, env, subscriptionPath, nodeId) {
   } catch (e) {}
 
   const nodeName = extractNodeName(originalLink);
+  const tags = nodeData.tags || ''; // 获取标签，如果未提供则保持原有值
 
   await env.DB.batch([
     env.DB.prepare(`
       UPDATE nodes 
-      SET original_link = ?, name = ? 
+      SET original_link = ?, name = ?, tags = ?
       WHERE id = ? AND subscription_id = ?
-    `).bind(originalLink, nodeName || '未命名节点', nodeId, subscriptionId),
+    `).bind(originalLink, nodeName || '未命名节点', tags, nodeId, subscriptionId),
     env.DB.prepare(
       "UPDATE subscriptions SET updated_at = ? WHERE id = ?"
     ).bind(now, subscriptionId)
