@@ -293,7 +293,7 @@ export default {
             const now = Date.now();
             const result = await env.DB.prepare(
               "INSERT INTO subscriptions (name, path, sub_order, updated_at) VALUES (?, ?, ?, ?)"
-            ).bind(name, path, now, now, 'sub.xeton.dev').run();
+            ).bind(name, path, now, now).run();
 
             if (!result.success) {
               throw new Error('创建订阅失败');
@@ -2500,12 +2500,6 @@ function serveAdminPanel(env, adminPath) {
             <div class="form-hint">仅支持小写字母、数字和连字符，5-50个字符</div>
             <div class="form-error" id="editSubPathError"></div>
           </div>
-          <div class="form-group">
-            <label class="form-label">订阅转换后端</label>
-            <select class="form-select" name="converterBackend" id="editConverterBackend">
-            </select>
-            <div class="form-hint">选择不同的订阅转换后端服务器</div>
-          </div>
         </form>
       </div>
       <div class="modal-footer modal-footer-split">
@@ -2933,39 +2927,6 @@ Base64编码格式
     }
 
     // 生成订阅转换器链接
-    function generateSubConverterUrl(path, backend, target = 'clash') {
-      const origin = window.location.origin;
-      const v2rayUrl = origin + '/' + path + '/v2ray';
-      const encodedUrl = encodeURIComponent(v2rayUrl);
-      
-      const backendUrl = backend || 'sub.xeton.dev';
-      
-      let targetParam = target;
-      let extraParams = '';
-      
-      switch(target) {
-        case 'clash':
-          targetParam = 'clash';
-          break;
-        case 'surge':
-          targetParam = 'surge';
-          extraParams = '&ver=4';
-          break;
-        case 'loon':
-          targetParam = 'loon';
-          break;
-        case 'quanx':
-          targetParam = 'quanx';
-          break;
-        case 'shadowrocket':
-          targetParam = 'mixed';
-          break;
-        default:
-          targetParam = 'clash';
-      }
-      
-      return \`https://\${backendUrl}/sub?target=\${targetParam}&url=\${encodedUrl}&insert=false&config=https%3A%2F%2Fraw.githubusercontent.com%2Fszkane%2FClashRuleSet%2Fmain%2FClash%2Fkclash.ini&emoji=true&list=false&xudp=false&udp=true&tfo=false&expand=false&scv=false&fdn=false&new_name=true\${extraParams}\`;
-    }
 
     // 一键导入各客户端
     function importToClient(path, backend, client) {
@@ -3001,16 +2962,64 @@ Base64编码格式
         window.location.href = importUrl;
         showToast(\`正在唤起 \${client} 客户端...\`, 'info');
       }
+    // 一键导入各客户端
+    function importToClient(path, backend, client) {
+      // 使用本地订阅链接而非转换服务
+      let localUrl = '';
+      switch(client) {
+        case 'clash':
+          localUrl = window.location.origin + '/' + path + '/clash';
+          break;
+        case 'surge':
+          localUrl = window.location.origin + '/' + path + '/surge';
+          break;
+        case 'stash':
+          localUrl = window.location.origin + '/' + path + '/clash';
+          break;
+        case 'loon':
+          localUrl = window.location.origin + '/' + path + '/clash';
+          break;
+        case 'quanx':
+          localUrl = window.location.origin + '/' + path + '/clash';
+          break;
+        case 'shadowrocket':
+          localUrl = window.location.origin + '/' + path + '/v2ray';
+          break;
+        default:
+          localUrl = window.location.origin + '/' + path + '/clash';
+      }
+      
+      let importUrl = '';
+      switch(client) {
+        case 'clash':
+          importUrl = 'clash://install-config?url=' + encodeURIComponent(localUrl);
+          break;
+        case 'stash':
+          importUrl = 'stash://install-config?url=' + encodeURIComponent(localUrl);
+          break;
+        case 'surge':
+          importUrl = 'surge:///install-config?url=' + encodeURIComponent(localUrl);
+          break;
+        case 'loon':
+          importUrl = 'loon://import?sub=' + encodeURIComponent(localUrl);
+          break;
+        case 'shadowrocket':
+          const origin = window.location.origin;
+          const v2rayUrl = origin + '/' + path + '/v2ray';
+          importUrl = 'sub://' + btoa(v2rayUrl);
+          break;
+        case 'quanx':
+          importUrl = 'quantumult-x:///add-resource?remote-resource=' + encodeURIComponent(JSON.stringify({
+            server_remote: [localUrl + ', tag=SubHub']
+          }));
+          break;
+      }
+      
+      if (importUrl) {
+        window.location.href = importUrl;
+        showToast(`正在唤起 ${client} 客户端...`, 'info');
+      }
     }
-
-    // 关闭所有下拉菜单
-    function closeAllDropdowns() {
-      document.querySelectorAll('.dropdown-menu.show').forEach(menu => {
-        menu.classList.remove('show');
-      });
-    }
-
-    // 切换下拉菜单
     function toggleDropdown(e, menuId) {
       e.stopPropagation();
       const menu = document.getElementById(menuId);
@@ -4134,7 +4143,6 @@ async function handleGetSubscriptions(env) {
       s.name,
       s.sub_order,
       s.updated_at,
-      s.converter_backend,
       COUNT(n.id) as nodeCount
     FROM subscriptions s
     LEFT JOIN nodes n ON s.id = n.subscription_id
@@ -4146,9 +4154,7 @@ async function handleGetSubscriptions(env) {
     name: item.name,
     path: item.path,
     nodeCount: item.nodeCount || 0,
-      s.name, s.path, s.sub_order, s.updated_at, COUNT(n.id) as nodeCount
-    updated_at: item.updated_at || null,
-    converter_backend: item.converter_backend || 'sub.xeton.dev'
+    updated_at: item.updated_at || null
   }));
 
   return createSuccessResponse(subscriptions);
@@ -4491,7 +4497,6 @@ function parseSocksLink(socksLink) {
 async function handleUpdateSubscriptionInfo(env, path, data) {
   const name = data.name?.trim();
   const newPath = data.path?.trim();
-  const converterBackend = data.converter_backend || 'sub.xeton.dev';
 
   if (!name) {
     return createErrorResponse('订阅名称不能为空', 400);
@@ -4514,10 +4519,10 @@ async function handleUpdateSubscriptionInfo(env, path, data) {
 
     const statements = [
       env.DB.prepare(
-        "UPDATE subscriptions SET name = ?, path = ?, converter_backend = ? WHERE path = ?"
-      ).bind(name, newPath, converterBackend, path),
+        "UPDATE subscriptions SET name = ?, path = ? WHERE path = ?"
+      ).bind(name, newPath, path),
       env.DB.prepare(
-        "SELECT id, name, path, converter_backend FROM subscriptions WHERE path = ?"
+        "SELECT id, name, path FROM subscriptions WHERE path = ?"
       ).bind(newPath)
     ];
 
@@ -4526,7 +4531,7 @@ async function handleUpdateSubscriptionInfo(env, path, data) {
     if (!results?.[0]) {
       return createErrorResponse('更新失败：找不到订阅', 404);
     }
-        "UPDATE subscriptions SET name = ?, path = ? WHERE path = ?"
+    
     return createSuccessResponse(results[0], '订阅信息已更新');
   } catch (error) {
     return createErrorResponse('更新订阅信息失败: ' + error.message);
