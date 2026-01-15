@@ -606,11 +606,10 @@
       if (!error.fatal) {
         if (error.details === 'bufferStalledError' || error.details === 'bufferNudgeOnStall') {
           console.warn('Handling buffer stall error...');
-          setTimeout(() => {
-            if (!video.paused && video.currentTime === lastCurrentTime) {
-              console.log('长时间缓冲停滞，建议手动刷新页面...');
-            }
-          }, 5000);
+          // 不要立即刷新页面，尝试恢复播放
+          if (hls) {
+            hls.recoverMediaError();
+          }
         } else if (error.details === 'fragLoadError') {
           console.warn('Fragment loading error, retrying...');
         }
@@ -620,26 +619,40 @@
       switch(error.type) {
         case Hls.ErrorTypes.NETWORK_ERROR:
           console.warn('Fatal network error, try to recover');
+          // 尝试重新加载，但保留当前位置
           setTimeout(() => {
             if (hls) {
+              const currentTime = video.currentTime;
               hls.startLoad();
+              // 稍后跳转到之前的位置
+              setTimeout(() => {
+                video.currentTime = currentTime;
+              }, 1000);
             }
           }, 2000);
           break;
         case Hls.ErrorTypes.MEDIA_ERROR:
           console.warn('Fatal media error, try to recover');
+          // 尝试恢复媒体错误而不是完全重启
           setTimeout(() => {
-            const currentSrc = video.src || (hls && hls.url);
-            if (currentSrc) {
-              startVideo(currentSrc, $('videoTitle').innerText, !video.paused);
+            if (hls) {
+              hls.recoverMediaError();
             }
           }, 1000);
           break;
         default:
           console.error('Unrecoverable error, reload player');
+          // 尝试使用当前URL重新开始，但保持播放位置
           const currentSrc = video.src || (hls && hls.url);
           if (currentSrc) {
+            const currentTime = video.currentTime;
             startVideo(currentSrc, $('videoTitle').innerText, !video.paused);
+            // 在视频加载完成后跳转到之前的位置
+            setTimeout(() => {
+              if (video.readyState >= 1) {
+                video.currentTime = currentTime;
+              }
+            }, 2000);
           } else {
             console.log('无法恢复播放器，可手动刷新页面...');
           }
@@ -783,6 +796,12 @@
     function startVideo(m3u8, name, auto = true) {
       if (!m3u8) return;
       
+      // 保存当前播放时间用于恢复
+      let currentPlayTime = 0;
+      if (video.currentTime) {
+        currentPlayTime = video.currentTime;
+      }
+      
       if (hls) {
         hls.off(Hls.Events.ERROR);
         hls.off(Hls.Events.MANIFEST_PARSED);
@@ -822,6 +841,9 @@
           } else {
             video.currentTime = savedPosition;
           }
+        } else if (currentPlayTime > 0) {
+          // 如果是恢复播放，则使用之前的播放时间
+          video.currentTime = currentPlayTime;
         }
 
         if (Hls.isSupported()) {
@@ -831,7 +853,16 @@
           });
 
           hls.on(Hls.Events.BUFFER_APPENDED, () => {
+            // 更新缓冲条显示
+            if (video.duration && video.buffered.length) {
+              buf.style.width = (video.buffered.end(video.buffered.length - 1) / video.duration * 100) + "%";
+            }
             preloadTimeRange(30);
+          });
+          
+          // 监听级别切换事件，用于性能优化
+          hls.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
+            console.log('当前播放质量:', data.level);
           });
         } else {
           video.addEventListener('loadeddata', () => {
@@ -877,8 +908,26 @@
             const bufferedEnd = video.buffered.end(video.buffered.length - 1);
             const targetTime = Math.min(video.duration || Infinity, video.currentTime + secondsToPreload);
 
-            if (bufferedEnd < targetTime) {}
-          } catch (e) {}
+            if (bufferedEnd < targetTime) {
+              // 检查缓冲区是否太小，如果是则触发加载
+              const bufferGap = targetTime - bufferedEnd;
+              if (bufferGap > 5) { // 如果缓冲差距超过5秒
+                // 对于HLS，我们可以通过调整配置来优化缓冲
+                if (hls) {
+                  // 确保HLS.js保持足够的缓冲区
+                  hls.config.maxBufferLength = Math.min(90, hls.config.maxBufferLength + 10);
+                }
+              }
+            }
+            
+            // 更新UI上的缓冲进度条
+            if (video.duration) {
+              const bufferedEnd = video.buffered.end(video.buffered.length - 1);
+              buf.style.width = (bufferedEnd / video.duration * 100) + "%";
+            }
+          } catch (e) {
+            console.warn('缓冲区计算错误:', e);
+          }
         }
       }
 
@@ -899,6 +948,15 @@
         hls.on(Hls.Events.MANIFEST_PARSED, setup);
         hls.on(Hls.Events.ERROR, function (event, data) {
           handleHlsError(data);
+        });
+        
+        // 添加性能监控
+        hls.on(Hls.Events.FRAG_BUFFERED, (event, data) => {
+          // 更新缓冲进度条
+          if (video.duration) {
+            const bufferedEnd = video.buffered.end(video.buffered.length - 1);
+            buf.style.width = (bufferedEnd / video.duration * 100) + "%";
+          }
         });
       } else {
         video.src = finalUrl;
@@ -1068,6 +1126,9 @@
         const history = JSON.parse(localStorage.getItem('video_history') || '{}');
         delete history[data.videoId];
         localStorage.setItem('video_history', JSON.stringify(history));
+        
+        // 清除当前视频信息
+        localStorage.removeItem('current_video');
       }
 
       playNext();
@@ -1187,14 +1248,29 @@
       video.setAttribute('preload', 'metadata');
       video.setAttribute('x-webkit-airplay', 'deny');
       
+      // 优化渲染性能
       video.style.transform = 'translateZ(0)';
       video.style.willChange = 'transform';
       
+      // 添加更完善的网络恢复处理
       window.addEventListener('online', function() {
         console.log('网络连接已恢复，重新优化播放参数');
         if (hls) {
-          hls.recoverMediaError();
+          // 延迟一点时间再尝试恢复，确保网络稳定
+          setTimeout(() => {
+            hls.recoverMediaError();
+            // 更新缓冲区
+            if (video.currentTime) {
+              const currentTime = video.currentTime;
+              hls.startLoad(currentTime);
+            }
+          }, 1000);
         }
+      });
+      
+      // 监听网络状态变化
+      window.addEventListener('offline', function() {
+        console.log('网络连接断开，准备在网络恢复后重连');
       });
     }
 
@@ -1216,7 +1292,17 @@
         }
 
         stallDetectionTimer = setTimeout(() => {
-          console.log('检测到视频长时间卡顿，建议手动刷新页面...');
+          console.log('检测到视频长时间卡顿，尝试自动恢复...');
+          // 不要建议手动刷新页面，而是尝试自动恢复
+          if (hls) {
+            hls.recoverMediaError();
+          } else if (video.src) {
+            // 重新加载视频源而不刷新整个页面
+            const currentTime = video.currentTime;
+            video.load();
+            video.currentTime = currentTime;
+            video.play().catch(e => console.log("自动恢复播放失败:", e));
+          }
         }, 10000);
       } else {
         lastCurrentTime = video.currentTime;
