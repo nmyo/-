@@ -4,14 +4,33 @@ import os
 import requests
 import math
 from flask import Flask, render_template_string, request, jsonify, Response
-from urllib.parse import urljoin, quote, unquote
+from urllib.parse import urljoin, quote, unquote, urlparse
+from werkzeug.middleware.proxy_fix import ProxyFix
+import logging
+from datetime import datetime
 
 app = Flask(__name__)
+
+# 配置应用以安全地运行在反向代理后面
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
+# 应用安全配置
+app.config.update(
+    SECRET_KEY=os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production'),
+    SESSION_COOKIE_SECURE=True,  # 在HTTPS环境下才发送cookie
+    SESSION_COOKIE_HTTPONLY=True,  # 防止XSS攻击
+    SESSION_COOKIE_SAMESITE='Lax',  # 防止CSRF攻击
+    PERMANENT_SESSION_LIFETIME=3600  # 会话过期时间（秒）
+)
 
 # 数据库配置
 DB_COVERS = "JavD.db"
 DB_LINKS = "M3U8.db"
 PER_PAGE = 30  # 每页显示数量
+
+# 安全日志配置
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # --- MissAV 伪装配置 ---
 HEADERS = {
@@ -19,12 +38,51 @@ HEADERS = {
     'Referer': 'https://missav.ai/',
 }
 
+def validate_url(url):
+    """验证URL的安全性"""
+    if not url:
+        return False
+    try:
+        parsed = urlparse(url)
+        # 只允许HTTP和HTTPS协议
+        if parsed.scheme not in ['http', 'https']:
+            return False
+        # 不允许IP地址直接访问（防止SSRF）
+        if re.match(r'^\d+\.\d+\.\d+\.\d+', parsed.hostname):
+            return False
+        # 不允许内部IP段（防止SSRF）
+        if parsed.hostname and parsed.hostname.startswith(('10.', '172.', '192.')):
+            return False
+        return True
+    except Exception:
+        return False
+
+
 def get_pure_code(raw):
     if not raw: return ""
     match = re.search(r'([A-Za-z]{2,10})[-_]([0-9]{2,10})', raw)
     if match:
         return f"{match.group(1).upper()}-{match.group(2)}"
     return raw.strip().upper()
+
+def add_security_headers(response):
+    """为所有响应添加安全头"""
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'  # 或者 'SAMEORIGIN' 如果需要嵌入
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    response.headers['Referrer-Policy'] = 'no-referrer-when-downgrade'
+    response.headers['Content-Security-Policy'] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "img-src 'self' data: https:; "
+        "font-src 'self' https://cdn.jsdelivr.net; "
+        "connect-src 'self'; "
+        "frame-ancestors 'none';"
+    )
+    return response
+
 
 def format_video_title(title):
     """格式化视频标题，处理后缀替换和大写转换"""
@@ -263,30 +321,122 @@ def get_links():
 @app.route('/proxy_m3u8')
 def proxy_m3u8():
     target_url = request.args.get('url')
+    
+    # 验证URL安全性
+    if not target_url or not validate_url(target_url):
+        logger.warning(f"Invalid URL requested: {target_url}")
+        return "Invalid URL", 400
+    
     try:
-        r = requests.get(target_url, headers=HEADERS, timeout=10)
-        lines = r.text.splitlines()
+        # 添加请求限制和超时设置
+        r = requests.get(target_url, headers=HEADERS, timeout=(5, 10), allow_redirects=True, stream=True)
+        
+        # 检查响应内容类型
+        content_type = r.headers.get('Content-Type', '')
+        if 'application/vnd.apple.mpegurl' not in content_type and 'audio/x-mpegurl' not in content_type and 'text/plain' not in content_type:
+            logger.warning(f"Invalid content type for m3u8: {content_type}")
+            return "Invalid content type", 400
+        
+        # 限制响应大小
+        content_length = r.headers.get('Content-Length')
+        if content_length and int(content_length) > 1024 * 1024:  # 1MB limit
+            logger.warning(f"M3U8 file too large: {content_length} bytes")
+            return "File too large", 413
+            
+        content = r.text[:1024*1024]  # Limit reading to 1MB
+        lines = content.splitlines()
         new_lines = []
         for line in lines:
             line = line.strip()
             if line and not line.startswith('#'):
                 full_path = urljoin(target_url, line)
-                if '.m3u8' in line.lower():
-                    new_lines.append(f"/proxy_m3u8?url={quote(full_path)}")
+                # Re-validate generated URLs
+                if validate_url(full_path):
+                    if '.m3u8' in line.lower():
+                        new_lines.append(f"/proxy_m3u8?url={quote(full_path)}")
+                    else:
+                        new_lines.append(f"/proxy_ts?url={quote(full_path)}")
                 else:
-                    new_lines.append(f"/proxy_ts?url={quote(full_path)}")
+                    logger.warning(f"Blocked unsafe URL in playlist: {full_path}")
+                    new_lines.append("# Blocked unsafe URL")
             else:
                 new_lines.append(line)
         return Response("\n".join(new_lines), mimetype='application/vnd.apple.mpegurl')
-    except: return "M3U8 Proxy Error", 500
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Request error in proxy_m3u8: {str(e)}")
+        return "Request failed", 502
+    except Exception as e:
+        logger.error(f"Server error in proxy_m3u8: {str(e)}")
+        return "M3U8 Proxy Error", 500
 
 @app.route('/proxy_ts')
 def proxy_ts():
     target_url = unquote(request.args.get('url'))
+    
+    # 验证URL安全性
+    if not target_url or not validate_url(target_url):
+        logger.warning(f"Invalid URL requested: {target_url}")
+        return "Invalid URL", 400
+    
     try:
-        resp = requests.get(target_url, headers=HEADERS, stream=True, timeout=20)
-        return Response(resp.iter_content(chunk_size=256*1024), status=resp.status_code, content_type=resp.headers.get('Content-Type'))
-    except: return "TS Proxy Error", 500
+        # 对TS文件进行更严格的限制，因为它们可能很大
+        resp = requests.get(target_url, headers=HEADERS, stream=True, timeout=(5, 30))
+        
+        # 检查内容类型确保是视频相关类型
+        content_type = resp.headers.get('Content-Type', '').lower()
+        if not any(ct in content_type for ct in ['video', 'mpeg', 'binary']):
+            logger.warning(f"Invalid content type for ts: {content_type}")
+            return "Invalid content type", 400
+        
+        # 检查内容长度，限制单个TS文件大小
+        content_length = resp.headers.get('Content-Length')
+        if content_length and int(content_length) > 50 * 1024 * 1024:  # 50MB limit
+            logger.warning(f"TS file too large: {content_length} bytes")
+            return "File too large", 413
+        
+        def generate():
+            chunk_size = 1024 * 1024  # 1MB chunks
+            downloaded = 0
+            max_size = 50 * 1024 * 1024  # 50MB limit
+            
+            for chunk in resp.iter_content(chunk_size=chunk_size):
+                if chunk:  # filter out keep-alive chunks
+                    downloaded += len(chunk)
+                    if downloaded > max_size:
+                        logger.warning(f"TS download exceeded size limit: {downloaded} bytes")
+                        break
+                    yield chunk
+        
+        return Response(generate(), status=resp.status_code, content_type=resp.headers.get('Content-Type'))
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Request error in proxy_ts: {str(e)}")
+        return "Request failed", 502
+    except Exception as e:
+        logger.error(f"Server error in proxy_ts: {str(e)}")
+        return "TS Proxy Error", 500
+
+# 应用安全头到所有响应
+@app.after_request
+def after_request(response):
+    response = add_security_headers(response)
+    return response
+
+@app.errorhandler(404)
+def not_found(error):
+    logger.warning(f"404 error: {request.url}")
+    return jsonify({"error": "Resource not found"}), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    logger.error(f"Internal server error: {str(error)}")
+    return jsonify({"error": "Internal server error"}), 500
+
+@app.route('/health')
+def health_check():
+    """健康检查端点"""
+    return jsonify({"status": "healthy", "timestamp": datetime.utcnow().isoformat()}), 200
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    # 在生产环境中不使用此方式启动
+    print("Development server not recommended for production!")
+    app.run(host='0.0.0.0', port=5000, debug=False)
