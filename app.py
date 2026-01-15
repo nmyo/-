@@ -26,6 +26,21 @@ def get_pure_code(raw):
         return f"{match.group(1).upper()}-{match.group(2)}"
     return raw.strip().upper()
 
+def format_video_title(title):
+    """格式化视频标题，处理后缀替换和大写转换"""
+    if not title:
+        return ""
+    
+    # 将整个标题转为大写
+    formatted_title = title.upper()
+    
+    # 替换特定后缀
+    formatted_title = re.sub(r'_ORIGINAL$', '', formatted_title)  # 删除 _ORIGINAL 后缀
+    formatted_title = re.sub(r'_UNCENSORED-LEAK$', '_无码', formatted_title)  # 将 _UNCENSORED-LEAK 替换为 _无码
+    formatted_title = re.sub(r'_CHINESE-SUBTITLE$', '_中文字幕', formatted_title)  # 将 _CHINESE-SUBTITLE 替换为 _中文字幕
+    
+    return formatted_title
+
 # --- 前端界面 ---
 HTML_TEMPLATE = """
 <!DOCTYPE html>
@@ -48,7 +63,8 @@ HTML_TEMPLATE = """
         .card-item:hover { border-color: #ff0050; transform: translateY(-5px); }
         
         .img-container { position: relative; cursor: zoom-in; }
-        .card-img-top { width: 100%; height: auto; display: block; min-height: 100px; background: #1a1a1a; }
+        .card-img-top { width: 100%; height: auto; display: block; min-height: 100px; background: #1a1a1a; object-fit: cover; box-shadow: 0 4px 8px rgba(0,0,0,0.3); transition: transform 0.3s ease; }
+        .card-img-top:hover { transform: scale(1.02); }
         
         .info-box { padding: 10px; cursor: pointer; }
         
@@ -114,7 +130,7 @@ HTML_TEMPLATE = """
     <div class="modal-dialog modal-xl modal-dialog-centered">
         <div class="modal-content bg-dark border-secondary">
             <div class="modal-header border-secondary text-white">
-                <h6 class="modal-title">线路选择</h6>
+                <h6 class="modal-title">视频源选择</h6>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
@@ -222,6 +238,11 @@ def index():
             total_count = cursor.execute(count_sql).fetchone()[0]
             
         items = [dict(r) for r in cursor.execute(data_sql, params).fetchall()]
+        
+        # 格式化视频标题
+        for item in items:
+            item['video_title'] = format_video_title(item['video_title'])
+            
         total_pages = math.ceil(total_count / PER_PAGE)
         conn.close()
         
@@ -236,7 +257,7 @@ def get_links():
     search_code = get_pure_code(code)
     # 模糊匹配番号或纯番号
     res = c.execute("SELECT title, m3u8_url FROM video_links WHERE title LIKE ? OR title LIKE ? LIMIT 10", (f"%{code}%", f"%{search_code}%")).fetchall()
-    data = [{"name": r['title'], "url": r['m3u8_url']} for r in res]; c.close()
+    data = [{"name": format_video_title(r['title']), "url": r['m3u8_url']} for r in res]; c.close()
     return jsonify({"success": True, "data": data})
 
 @app.route('/proxy_m3u8')
