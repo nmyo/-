@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Reader</title>
+    <style>
+        :root {
+            --accent: #6366f1;
+            --bg-bar: rgba(20, 20, 20, 0.95);
+        }
+
+        * {
+            -webkit-tap-highlight-color: transparent;
+            outline: none;
+        }
+
+        body {
+            user-select: none;
+            margin: 0;
+            background: #000;
+            height: 100vh;
+            overflow: hidden;
+            font-family: -apple-system, sans-serif;
+        }
+
+        #viewer {
+            width: 100%;
+            height: 100%;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            scroll-behavior: smooth;
+        }
+
+        .comic-page {
+            display: block;
+            max-width: 100%;
+            min-height: 50vh;
+            background: #000;
+            margin-bottom: 10px;
+        }
+
+        .mode-side .comic-page {
+            margin-bottom: 0;
+            height: 100vh;
+            width: 100vw;
+            object-fit: contain;
+        }
+
+        .bar {
+            position: fixed;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--bg-bar);
+            backdrop-filter: blur(20px);
+            color: white;
+            z-index: 1000;
+            transition: 0.3s;
+            width: 90%;
+            max-width: 400px;
+            padding: 12px 20px;
+            border-radius: 20px;
+            border: 1px solid #333;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        #top-bar {
+            top: 20px;
+            transform: translate(-50%, -150%);
+        }
+
+        #bottom-bar {
+            bottom: 20px;
+            transform: translate(-50%, 150%);
+        }
+
+        .show #top-bar,
+        .show #bottom-bar {
+            transform: translate(-50%, 0);
+        }
+
+        .btn {
+            background: #222;
+            color: #fff;
+            border: 1px solid #333;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+        }
+
+        .btn.active {
+            background: var(--accent);
+            border-color: var(--accent);
+        }
+    </style>
+</head>
+
+<body class="mode-side">
+    <div id="top-bar" class="bar">
+        <button class="btn" onclick="location.href='/'">✕</button>
+        <div style="display:flex; gap:10px">
+            <button id="b-side" class="btn" onclick="setMode('side')">翻页</button>
+            <button id="b-scroll" class="btn" onclick="setMode('scroll')">连读</button>
+        </div>
+        <div style="width:30px"></div>
+    </div>
+    <div id="bottom-bar" class="bar">
+        <span id="cp">1</span>
+        <input type="range" id="slider" style="flex:1; margin: 0 15px; accent-color: var(--accent)"
+            oninput="jump(this.value)">
+        <span id="tp">1</span>
+    </div>
+    <div id="viewer" onclick="handle(event)" onscroll="check()"></div>
+
+    <script>
+        const id = new URLSearchParams(location.search).get('id');
+        let page = parseInt(localStorage.getItem(`prog_${id}`)) || 0, total = 0, mode = localStorage.getItem('mode') || 'side';
+
+        async function init() {
+            const info = await (await fetch(`/api/book_info/${encodeURIComponent(id)}`)).json();
+            total = info.total_pages;
+            document.getElementById('tp').innerText = total;
+            document.getElementById('slider').max = total - 1;
+            setMode(mode);
+        }
+
+        function setMode(m) {
+            mode = m; localStorage.setItem('mode', m);
+            document.body.className = 'mode-' + mode;
+            document.getElementById('b-side').classList.toggle('active', m === 'side');
+            document.getElementById('b-scroll').classList.toggle('active', m === 'scroll');
+            document.getElementById('viewer').innerHTML = '';
+            if (m === 'side') add(page);
+            else {
+                for (let i = Math.max(0, page - 1); i <= Math.min(total - 1, page + 1); i++) add(i);
+                setTimeout(() => document.getElementById(`p-${page}`)?.scrollIntoView(), 50);
+            }
+            updateUI();
+        }
+
+        function add(p) {
+            if (p < 0 || p >= total || document.getElementById(`p-${p}`)) return;
+            const img = document.createElement('img');
+            img.id = `p-${p}`; img.className = 'comic-page'; img.dataset.page = p;
+            img.src = `/api/image/${encodeURIComponent(id)}/${p}`;
+            document.getElementById('viewer').appendChild(img);
+        }
+
+        function check() {
+            if (mode !== 'scroll') return;
+            const v = document.getElementById('viewer');
+            if (v.scrollTop + v.clientHeight >= v.scrollHeight - 1000) {
+                const last = parseInt(v.lastElementChild?.dataset.page || 0);
+                if (last < total - 1) add(last + 1);
+            }
+            // DOM 回收机制：防止内存溢出
+            document.querySelectorAll('.comic-page').forEach(img => {
+                const r = img.getBoundingClientRect();
+                if (r.top < innerHeight / 2 && r.bottom > innerHeight / 2) {
+                    const p = parseInt(img.dataset.page);
+                    if (p !== page) { page = p; updateUI(); }
+                }
+                // 距离视口超过 3 屏的图片卸载资源
+                if (r.bottom < -innerHeight * 3 || r.top > innerHeight * 4) {
+                    if (img.src) { img.dataset.src = img.src; img.removeAttribute('src'); }
+                } else if (!img.src && img.dataset.src) {
+                    img.src = img.dataset.src;
+                }
+            });
+        }
+
+        function jump(p) { page = parseInt(p); setMode(mode); }
+        function updateUI() {
+            document.getElementById('cp').innerText = page + 1;
+            document.getElementById('slider').value = page;
+            localStorage.setItem(`prog_${id}`, page);
+            localStorage.setItem(`meta_${id}`, JSON.stringify({ rel_path: id, title: "正在阅读", time: Date.now() }));
+        }
+
+        function handle(e) {
+            if (e.target.closest('.bar')) return;
+            const x = e.clientX, w = innerWidth;
+            if (mode === 'side') {
+                if (x < w * 0.3 && page > 0) { page--; setMode('side'); }
+                else if (x > w * 0.7 && page < total - 1) { page++; setMode('side'); }
+                else document.body.classList.toggle('show');
+            } else document.body.classList.toggle('show');
+        }
+        window.onload = init;
+    </script>
+</body>
+
+</html>

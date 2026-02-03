@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PK Admin</title>
+    <style>
+        body {
+            background: #000;
+            color: #fff;
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 50px 20px;
+        }
+
+        .box {
+            background: #111;
+            padding: 30px;
+            border-radius: 20px;
+            border: 1px solid #222;
+            width: 100%;
+            max-width: 350px;
+            text-align: center;
+        }
+
+        .btn {
+            background: #6366f1;
+            color: #fff;
+            border: none;
+            width: 100%;
+            padding: 15px;
+            border-radius: 12px;
+            font-weight: bold;
+            margin-top: 20px;
+        }
+
+        input {
+            background: #000;
+            border: 1px solid #333;
+            color: #fff;
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 20px;
+            border-radius: 10px;
+            box-sizing: border-box;
+        }
+
+        .hide {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="login" class="box">
+        <h2>Login</h2>
+        <form action="/login" method="post"><input type="password" name="password" required><button
+                class="btn">Login</button></form>
+    </div>
+    <div id="main" class="box hide">
+        <h2 id="total">-</h2>
+        <p id="path" style="font-size: 12px; color: #666"></p>
+        <button class="btn" id="s-btn" onclick="sync()">立即同步库</button>
+    </div>
+    <script>
+        async function check() {
+            const res = await fetch('/api/stats');
+            if (res.ok) {
+                const d = await res.json();
+                document.getElementById('login').classList.add('hide');
+                document.getElementById('main').classList.remove('hide');
+                document.getElementById('total').innerText = d.total + " Files";
+                document.getElementById('path').innerText = d.path;
+            }
+        }
+        async function sync() {
+            const b = document.getElementById('s-btn'); b.disabled = true; b.innerText = "Syncing...";
+            await fetch('/api/sync', { method: 'POST' });
+            setTimeout(() => location.reload(), 2000);
+        }
+        check();
+    </script>
+</body>
+
+</html>
